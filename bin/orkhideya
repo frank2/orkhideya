@@ -1,0 +1,213 @@
+#!/bin/bash
+
+# ascii tbd
+# modify these variables to make things go places!
+ORK_CONFIG="$HOME/local/etc/orkhideya"
+ORK_LIB="$HOME/local/lib/orkhideya"
+
+# if the script requires root, automatically relaunch it with sudo
+if [ -n "$ORK_ROOT" -a "$(id -u)" != "0" ]; then
+   sudo -E -- "$0" "$@"
+   exit $?
+fi
+
+for _lib_file in $(find "$ORK_LIB" -type f -executable); do
+   source "$_lib_file"
+done
+
+function lasterror
+{
+   echo "$?"
+}
+
+function cfunction
+{
+   source bash_theme
+
+   if [ ! -z "$ORK_FUNCTION" ]; then
+      echo "$THEME_MAIN_FOCUSED_COLOR$ORK_FUNCTION$THEME_MAIN_UNFOCUSED_COLOR>$CC_TERMINATE"
+   else
+      echo ""
+   fi
+}
+
+function carg
+{
+   source bash_theme
+   echo "$THEME_MAIN_FOCUSED_COLOR$@$CC_TERMINATE"
+}
+
+function cstatus
+{
+   source bash_theme
+   FORMAT="$1"
+   ORK_STATUS_PREFIX="${THEME_NORMAL_COLOR}]${THEME_WARNING_COLOR}] ${THEME_MAIN_COLOR}ORKH${THEME_ATTENTION_COLOR}i${THEME_MAIN_COLOR}DEYA${THEME_DECORATIVE_COLOR} ["
+   ORK_STATUS_NORMAL="$THEME_NORMAL_COLOR+$CC_TERMINATE"
+   ORK_STATUS_WARNING="$THEME_WARNING_COLOR?$CC_TERMINATE"
+   ORK_STATUS_ERROR="$THEME_ATTENTION_COLOR!$CC_TERMINATE"
+   ORK_STATUS_SUFFIX="${THEME_DECORATIVE_COLOR}]$CC_TERMINATE"
+
+   echo -n $ORK_STATUS_PREFIX
+
+   if [ "$FORMAT" == "error" ]; then
+      echo -n "$ORK_STATUS_ERROR"
+   elif [ "$FORMAT" == "warning" ]; then
+      echo -n "$ORK_STATUS_WARNING"
+   else
+      echo -n "$ORK_STATUS_NORMAL"
+   fi
+
+   echo "$ORK_STATUS_SUFFIX $(cfunction)"
+}
+
+function puts
+{
+   printf "$@\n" 1>&2
+}
+
+function cputs
+{
+   puts "$(echo "$@" | sed -e 's/\\\[//g' -e 's/\\]//g')"
+}
+
+function cupdate
+{
+   cputs "$(cstatus update) $@"
+}
+
+function cwarning
+{
+   cputs "$(cstatus warning) $@"
+}
+
+function cerror
+{
+   cputs "$(cstatus error) $@"
+}
+
+function active_network
+{
+   ACTIVE_NETWORK="$RJ45"
+
+   if [ "$(has_link "$RJ45")" == "0" ]; then
+      if [ "$(has_link "$WIFI")" == "0" ]; then
+         ACTIVE_NETWORK=""
+      else
+         ACTIVE_NETWORK="$WIFI"
+      fi
+   fi
+
+   echo $ACTIVE_NETWORK
+}
+
+function has_link
+{
+   IF="$1"
+   RESULT="$(cat /sys/class/net/$IF/carrier 2>/dev/null)"
+
+   if [ -z "$RESULT" ]; then
+      echo 0
+   else
+      echo "$RESULT"
+   fi
+}
+
+function has_connection
+{
+   IF="$1"
+   RESULT="$(ifconfig "$IF" | grep "inet" | grep -v "inet6")"
+
+   if [ -z "$RESULT" ]; then
+      echo 0
+   else
+      echo 1
+   fi
+}
+
+function is_up
+{
+   has_link $1
+}
+
+function soq
+{
+   $*
+   RESULT="$?"
+
+   if [ "$RESULT" != "0" ]; then
+      cerror "Execution failed (status: $RESULT)."
+      exit $RESULT
+   fi
+}
+
+function inherited_path
+{
+   ROOT="$1"
+   SITE="$2"
+   FILE="$3"
+
+   REAL_FILE="$ROOT/$SITE/$FILE"
+
+   while [ ! -e "$REAL_FILE" ]; do
+      if [ -z "$SITE" ]; then break; fi
+
+      SITE="$(set $(echo $SITE | sed -e 's/\//\n/g' | tac -); shift; echo $(echo $* | sed -e 's/ /\n/g' | tac -) | sed -e 's/ /\//g')"
+      REAL_FILE="$ROOT/$SITE/$FILE"
+   done
+
+   if [ -e "$REAL_FILE" ]; then
+      echo "$REAL_FILE"
+   fi
+}
+
+function inherited_file
+{
+   ROOT="$1"
+   SITE="$2"
+   FILE="$3"
+   ARGS="${@:4}"
+
+   REAL_FILE="$(inherited_path "$ROOT" "$SITE" "$FILE")"
+
+   if [ -e "$REAL_FILE" ]; then 
+      if [ -x "$REAL_FILE" ]; then
+         "$REAL_FILE" $ARGS
+      else
+         cat "$REAL_FILE"
+      fi
+   fi
+}
+
+function random_wallpaper
+{
+   WALLPAPER="$(ls "$LOCAL_WALLPAPERS/images" | grep "$1x$2" | sort -R | head -n1)"
+
+   if [ -n "$WALLPAPER" ]; then
+      echo "$LOCAL_WALLPAPERS/images/$WALLPAPER"
+   fi
+}
+
+function nitro_refresh
+{
+   rm $HOME/.config/nitrogen/bg-saved.cfg
+}
+
+function nitro_wallpaper
+{
+   SCREEN="$1"
+   IMAGE="$2"
+   MODE="$3"
+   BGCOLOR="$4"
+
+   if [ -n "$SCREEN" -a -n "$IMAGE" ]; then
+      if [ -z "$MODE" ]; then
+         MODE="0"
+      fi
+
+      if [ -z "$BGCOLOR" ]; then
+         BGCOLOR="#000000"
+      fi
+
+      printf "[%s]\nfile=%s\nmode=%d\nbgcolor=%s\n\n" "$SCREEN" "$IMAGE" $MODE "$BGCOLOR" >> $HOME/.config/nitrogen/bg-saved.cfg
+   fi
+}
