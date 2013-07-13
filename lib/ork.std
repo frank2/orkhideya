@@ -1,15 +1,5 @@
 #!/bin/bash
 
-# ascii tbd
-
-# modify these variables to make things go places!
-ORK_ETC="$HOME/local/etc/orkhideya"
-ORK_LIB="$HOME/local/lib/orkhideya"
-
-for _lib_file in $(find "$ORK_LIB" -type f -executable); do
-   source "$_lib_file"
-done
-
 function lasterror
 {
    echo "$?"
