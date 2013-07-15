@@ -1,0 +1,206 @@
+#!/bin/bash
+
+if [ -n "$ORK_STDOUT_SOURCED" ]; then return 0; fi
+export ORK_STDOUT_SOURCED=1
+
+source orkhideya
+source ork.colors
+source ork.stdlib
+
+function stdout_color
+{
+   _color="$1"
+   _message="${@:2}"
+
+   case "$_color" in
+      "attention")
+         _color="$STDOUT_COLOR_ATTENTION"
+         ;;
+      "decorative")
+         _color="$STDOUT_COLOR_DECORATIVE"
+         ;;
+      "alternate")
+         _color="$STDOUT_COLOR_ALTERNATE"
+         ;;
+      "window")
+         _color="$STDOUT_COLOR_WINDOW"
+         ;;
+      "warning")
+         _color="$STDOUT_COLOR_WARNING"
+         ;;
+      "text")
+         _color="$STDOUT_COLOR_TEXT"
+         ;;
+      "main")
+         _color="$STDOUT_COLOR_MAIN"
+         ;;
+      "main-focused")
+         _color="$STDOUT_COLOR_MAIN_FOCUSED"
+         ;;
+      "main-unfocused")
+         _color="$STDOUT_COLOR_MAIN_UNFOCUSED"
+         ;;
+      "normal")
+         _color="$STDOUT_COLOR_NORMAL"
+         ;;
+      "desperate")
+         _color="$STDOUT_COLOR_DESPERATE"
+         ;;
+      *)
+         return 1
+         ;;
+   esac
+
+   color_wrap "$_color" "$_message"
+   return 0
+}
+
+function stdout_isterm
+{
+   test -t 2
+   echo $?
+   return 0
+}
+
+function stdout_width
+{
+   tput cols
+   return 0
+}
+
+function stdout_truncate
+{
+   _length="$1"
+   _input="${@:2}"
+
+   _color_compensation="$(color_strip "$_input")"
+   _length="$(($_length + ( ${#_input} - ${#color_compensation} ) ))"
+
+   echo "${_input:0:$_length}"
+   return 0
+}
+
+function stdout_printf
+{
+   _format="$1"
+   _args="${@:2}"
+   printf "$_format" "$_args" 1>&2
+   return 0
+}
+
+function stdout_puts
+{
+   _output="$@"
+
+   if [ "$(stdout_isterm)" == "0" ]; then
+      echo "$(stdout_truncate "$(stdout_width)" "$_output")" 1>&2
+   else
+      echo "$(color_strip "$_output")" 1>&2
+   fi
+}
+
+function stdout_indicator
+{
+   _indicator="$1"
+
+   case "$_indicator" in
+      "warning")
+         echo "${STDOUT_INDICATOR_PREFIX}${STDOUT_INDICATOR_WARNING}${STDOUT_INDICATOR_SUFFIX}"
+         ;;
+      "error")
+         echo "${STDOUT_INDICATOR_PREFIX}${STDOUT_INDICATOR_ERROR}${STDOUT_INDICATOR_SUFFIX}"
+         ;;
+      *)
+         echo "${STDOUT_INDICATOR_PREFIX}${STDOUT_INDICATOR_NORMAL}${STDOUT_INDICATOR_SUFFIX}"
+         ;;
+   esac
+
+   return 0
+}
+
+function stdout_status
+{
+   _status="$1"
+   _message="${@:2}"
+
+   stdout_puts "${STDOUT_STATUS_PREFIX} $(stdout_indicator $_status) $(stdout_color main-focused "$STDOUT_STATUS_EXECUTOR")${STDOUT_STATUS_SUFFIX} $_message"
+   return 0
+}
+
+function stdout_normal
+{
+   _message="$@"
+   stdout_status normal "$_message"
+   return 0
+}
+
+function stdout_warning
+{
+   _message="$@"
+   stdout_status warning "$_message"
+   return 0
+}
+
+function stdout_error
+{
+   _message="$@"
+   stdout_status error "$_message"
+   return 0
+}
+
+function stdout_prompt
+{
+   _prompt="$@"
+   stdout_warning "$_prompt"
+   stdout_printf "%s%s" "$STDOUT_PROMPT" ' '
+   read _response
+   _status="$?"
+
+   if [ "$_status" == "0" ]; then
+      echo $_response
+   fi
+
+   return
+}
+
+# define the defaults of the theme and allow them to be overridden by the user's
+# bash theme
+
+# theme colors
+STDOUT_COLOR_ATTENTION="$(color_fg lightcyan)"
+STDOUT_COLOR_DECORATIVE="$(color_fg purple)"
+STDOUT_COLOR_ALTERNATE="$(color_fg cyan)"
+STDOUT_COLOR_WINDOW="$(color_fg lightcyan)"
+STDOUT_COLOR_WARNING="$(color_fg lightcyan)"
+STDOUT_COLOR_TEXT="$(color_fg lightpurple)"
+STDOUT_COLOR_NORMAL="$(color_fg lightcyan)"
+STDOUT_COLOR_MAIN="$(color_fg lightpurple)"
+STDOUT_COLOR_MAIN_FOCUSED="$(color_fg lightpurple)"
+STDOUT_COLOR_MAIN_UNFOCUSED="$(color_fg purple)"
+STDOUT_COLOR_DESPERATE="$(color_fg lightcyan)"
+
+# status prefix and suffix
+STDOUT_STATUS_PREFIX="$(stdout_color normal ']')"
+STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX}$(stdout_color warning ']')"
+STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX} $(stdout_color main 'ORKH')"
+STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX}$(stdout_color attention 'i')"
+STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX}$(stdout_color main 'DEYA')"
+STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX}$(stdout_color decorative ']')"
+
+STDOUT_STATUS_EXECUTOR="$(echo $0 | awk -F '/' '{ print $NF }')"
+
+STDOUT_STATUS_SUFFIX="$(stdout_color decorative '>')"
+
+# indicators
+STDOUT_INDICATOR_PREFIX="$(stdout_color decorative '[')"
+STDOUT_INDICATOR_SUFFIX="$(stdout_color decorative ']')"
+
+STDOUT_INDICATOR_NORMAL="$(stdout_color normal '+')"
+STDOUT_INDICATOR_WARNING="$(stdout_color warning '?')"
+STDOUT_INDICATOR_ERROR="$(stdout_color attention '!')"
+
+# prompt
+STDOUT_PROMPT="$(stdout_color attention '>')"
+
+# allow the user's theme to overwrite the variables
+stdlib_config stdout

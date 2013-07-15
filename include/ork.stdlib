@@ -1,0 +1,31 @@
+#!/bin/bash
+
+if [ -n "$ORK_STDLIB_SOURCED" ]; then return 0; fi
+export ORK_STDLIB_SOURCED=1
+
+source orkhideya
+source ork.stdout
+
+function stdlib_trap
+{
+   "$@"
+
+   if [ "$?" != "0" ]; then
+      stdout_error "Execution failed (status: $?)."
+      exit $?
+   fi
+
+   return 0
+}
+
+function stdlib_config
+{
+   _config="$ORK_ETC/$(echo $1 | sed -e 's,\.,/,g')"
+
+   if [ ! -r "$_config" ]; then
+      return 1
+   fi
+
+   source "$_config"
+   return 0
+}

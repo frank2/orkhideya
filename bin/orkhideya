@@ -1,208 +1,65 @@
 #!/bin/bash
 
+if [ -n "$ORK_SOURCED" ]; then return 0; fi
+export ORK_SOURCED=1
+
 # ascii tbd
+_executor="$(echo $0 | awk -F '/' '{ print $NF }')"
 
-# modify these variables to make things go places!
-ORK_ETC="$HOME/local/etc/orkhideya"
-ORK_LIB="$HOME/local/lib/orkhideya"
+# orkhideya needs to be sourced to work properly
+if [ "$_executor" == "orkhideya"  ]; then
+   echo "$_executor: not being sourced" 1>&2
+   exit 1
+fi
 
-for _lib_file in $(find "$ORK_LIB" -type f -executable); do
-   source "$_lib_file"
-done
+# the root of the orkhideya installation
+ORK_ROOT="/usr/local/lib/orkhideya"
 
-function lasterror
-{
-   echo "$?"
-}
+# modify these variables if you care a lot more about where things go
+ORK_ETC="etc"
+ORK_INCLUDE="include"
+ORK_BIN="bin"
 
-function cfunction
-{
-   source bash_theme
+# allow the user to override these variables, but prefer a system-wide solution
+if [ -r "/etc/orkhideya" ]; then
+   source /etc/orkhideya
+elif [ -r "$HOME/.orkhideya" ]; then
+   source $HOME/.orkhideya
+fi
 
-   if [ ! -z "$ORK_FUNCTION" ]; then
-      echo "$THEME_MAIN_FOCUSED_COLOR$ORK_FUNCTION$THEME_MAIN_UNFOCUSED_COLOR>$CC_TERMINATE"
-   else
-      echo ""
-   fi
-}
+if [ "${ORK_ETC:0:1}" != "/" ]; then
+   ORK_ETC="$ORK_ROOT/$ORK_ETC"
+fi
 
-function carg
-{
-   source bash_theme
-   echo "$THEME_MAIN_FOCUSED_COLOR$@$CC_TERMINATE"
-}
+if [ "${ORK_INCLUDE:0:1}" != "/" ]; then
+   ORK_INCLUDE="$ORK_ROOT/$ORK_INCLUDE"
+fi
 
-function cstatus
-{
-   source bash_theme
-   FORMAT="$1"
-   ORK_STATUS_PREFIX="${THEME_NORMAL_COLOR}]${THEME_WARNING_COLOR}] ${THEME_MAIN_COLOR}ORKH${THEME_ATTENTION_COLOR}i${THEME_MAIN_COLOR}DEYA${THEME_DECORATIVE_COLOR} ["
-   ORK_STATUS_NORMAL="$THEME_NORMAL_COLOR+$CC_TERMINATE"
-   ORK_STATUS_WARNING="$THEME_WARNING_COLOR?$CC_TERMINATE"
-   ORK_STATUS_ERROR="$THEME_ATTENTION_COLOR!$CC_TERMINATE"
-   ORK_STATUS_SUFFIX="${THEME_DECORATIVE_COLOR}]$CC_TERMINATE"
+if [ "${ORK_BIN:0:1}" != "/" ]; then
+   ORK_BIN="$ORK_ROOT/$ORK_BIN"
+fi
 
-   echo -n $ORK_STATUS_PREFIX
+if [ ! -d "$ORK_ROOT" ]; then
+   echo "$_executor: orkhideya: bad root: $ORK_ROOT" 1>&2
+   return 1
+fi
 
-   if [ "$FORMAT" == "error" ]; then
-      echo -n "$ORK_STATUS_ERROR"
-   elif [ "$FORMAT" == "warning" ]; then
-      echo -n "$ORK_STATUS_WARNING"
-   else
-      echo -n "$ORK_STATUS_NORMAL"
-   fi
+if [ ! -d "$ORK_ETC" ]; then
+   echo "$_executor: orkhideya: bad config directory: $ORK_ETC" 1>&2
+   return 1
+fi
 
-   echo "$ORK_STATUS_SUFFIX $(cfunction)"
-}
+if [ ! -d "$ORK_INCLUDE" ]; then
+   echo "$_executor: orkhideya: bad include directory: $ORK_INCLUDE" 1>&2
+   return 1
+fi
 
-function puts
-{
-   printf "$@\n" 1>&2
-}
+if [ ! -d "$ORK_BIN" ]; then
+   echo "$_executor: orkhideya: bad bin directory: $ORK_BIN" 1>&2
+   return 1
+fi
 
-function cputs
-{
-   puts "$(echo "$@" | sed -e 's/\\\[//g' -e 's/\\]//g')"
-}
-
-function cupdate
-{
-   cputs "$(cstatus update) $@"
-}
-
-function cwarning
-{
-   cputs "$(cstatus warning) $@"
-}
-
-function cerror
-{
-   cputs "$(cstatus error) $@"
-}
-
-function active_network
-{
-   ACTIVE_NETWORK="$RJ45"
-
-   if [ "$(has_link "$RJ45")" == "0" ]; then
-      if [ "$(has_link "$WIFI")" == "0" ]; then
-         ACTIVE_NETWORK=""
-      else
-         ACTIVE_NETWORK="$WIFI"
-      fi
-   fi
-
-   echo $ACTIVE_NETWORK
-}
-
-function has_link
-{
-   IF="$1"
-   RESULT="$(cat /sys/class/net/$IF/carrier 2>/dev/null)"
-
-   if [ -z "$RESULT" ]; then
-      echo 0
-   else
-      echo "$RESULT"
-   fi
-}
-
-function has_connection
-{
-   IF="$1"
-   RESULT="$(ifconfig "$IF" | grep "inet" | grep -v "inet6")"
-
-   if [ -z "$RESULT" ]; then
-      echo 0
-   else
-      echo 1
-   fi
-}
-
-function is_up
-{
-   has_link $1
-}
-
-function soq
-{
-   $*
-   RESULT="$?"
-
-   if [ "$RESULT" != "0" ]; then
-      cerror "Execution failed (status: $RESULT)."
-      exit $RESULT
-   fi
-}
-
-function inherited_path
-{
-   ROOT="$1"
-   SITE="$2"
-   FILE="$3"
-
-   REAL_FILE="$ROOT/$SITE/$FILE"
-
-   while [ ! -e "$REAL_FILE" ]; do
-      if [ -z "$SITE" ]; then break; fi
-
-      SITE="$(set $(echo $SITE | sed -e 's/\//\n/g' | tac -); shift; echo $(echo $* | sed -e 's/ /\n/g' | tac -) | sed -e 's/ /\//g')"
-      REAL_FILE="$ROOT/$SITE/$FILE"
-   done
-
-   if [ -e "$REAL_FILE" ]; then
-      echo "$REAL_FILE"
-   fi
-}
-
-function inherited_file
-{
-   ROOT="$1"
-   SITE="$2"
-   FILE="$3"
-   ARGS="${@:4}"
-
-   REAL_FILE="$(inherited_path "$ROOT" "$SITE" "$FILE")"
-
-   if [ -e "$REAL_FILE" ]; then 
-      if [ -x "$REAL_FILE" ]; then
-         "$REAL_FILE" $ARGS
-      else
-         cat "$REAL_FILE"
-      fi
-   fi
-}
-
-function random_wallpaper
-{
-   WALLPAPER="$(ls "$LOCAL_WALLPAPERS/images" | grep "$1x$2" | sort -R | head -n1)"
-
-   if [ -n "$WALLPAPER" ]; then
-      echo "$LOCAL_WALLPAPERS/images/$WALLPAPER"
-   fi
-}
-
-function nitro_refresh
-{
-   rm $HOME/.config/nitrogen/bg-saved.cfg
-}
-
-function nitro_wallpaper
-{
-   SCREEN="$1"
-   IMAGE="$2"
-   MODE="$3"
-   BGCOLOR="$4"
-
-   if [ -n "$SCREEN" -a -n "$IMAGE" ]; then
-      if [ -z "$MODE" ]; then
-         MODE="0"
-      fi
-
-      if [ -z "$BGCOLOR" ]; then
-         BGCOLOR="#000000"
-      fi
-
-      printf "[%s]\nfile=%s\nmode=%d\nbgcolor=%s\n\n" "$SCREEN" "$IMAGE" $MODE "$BGCOLOR" >> $HOME/.config/nitrogen/bg-saved.cfg
-   fi
-}
+# for e-z sourcing, we need to modify the path!
+if [ -z "$(echo $PATH | grep ":$ORK_INCLUDE")" ]; then
+   PATH="$PATH:$ORK_INCLUDE"
+fi
