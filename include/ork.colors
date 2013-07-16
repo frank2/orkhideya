@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ -n "$ORK_COLORS_SOURCED" ]; then return 0; fi
-export ORK_COLORS_SOURCED=1
+ORK_COLORS_SOURCED=1
 
 source orkhideya
 
@@ -33,35 +33,36 @@ CB_PURPLE="45"
 CB_CYAN="46"
 CB_GRAY="47"
 
-CC_BEGIN="$(printf "\e[")"
+CC_BEGIN="\[\e["
+CC_END="\]"
 
-CC_TERMINATE="${CC_BEGIN}0m"
+CC_TERMINATE="${CC_BEGIN}0m${CC_END}"
 
-FG_BLACK="${CC_BEGIN}0;${CF_BLACK}m"
-FG_WHITE="${CC_BEGIN}${CF_WHITE}m"
-FG_RED="${CC_BEGIN}0;${CF_RED}m"
-FG_LRED="${CC_BEGIN}${CF_LRED}m"
-FG_GREEN="${CC_BEGIN}0;${CF_GREEN}m"
-FG_LGREEN="${CC_BEGIN}${CF_LGREEN}m"
-FG_YELLOW="${CC_BEGIN}0;${CF_YELLOW}m"
-FG_LYELLOW="${CC_BEGIN}${CF_LYELLOW}m"
-FG_BLUE="${CC_BEGIN}0;${CF_BLUE}m"
-FG_LBLUE="${CC_BEGIN}${CF_LBLUE}m"
-FG_PURPLE="${CC_BEGIN}0;${CF_PURPLE}m"
-FG_LPURPLE="${CC_BEGIN}${CF_LPURPLE}m"
-FG_CYAN="${CC_BEGIN}0;${CF_CYAN}m"
-FG_LCYAN="${CC_BEGIN}${CF_LCYAN}m"
-FG_GRAY="${CC_BEGIN}0;${CF_GRAY}m"
-FG_LGRAY="${CC_BEGIN}${CF_LGRAY}m"
+FG_BLACK="${CC_BEGIN}0;${CF_BLACK}m${CC_END}"
+FG_WHITE="${CC_BEGIN}${CF_WHITE}m${CC_END}"
+FG_RED="${CC_BEGIN}0;${CF_RED}m${CC_END}"
+FG_LRED="${CC_BEGIN}${CF_LRED}m${CC_END}"
+FG_GREEN="${CC_BEGIN}0;${CF_GREEN}m${CC_END}"
+FG_LGREEN="${CC_BEGIN}${CF_LGREEN}m${CC_END}"
+FG_YELLOW="${CC_BEGIN}0;${CF_YELLOW}m${CC_END}"
+FG_LYELLOW="${CC_BEGIN}${CF_LYELLOW}m${CC_END}"
+FG_BLUE="${CC_BEGIN}0;${CF_BLUE}m${CC_END}"
+FG_LBLUE="${CC_BEGIN}${CF_LBLUE}m${CC_END}"
+FG_PURPLE="${CC_BEGIN}0;${CF_PURPLE}m${CC_END}"
+FG_LPURPLE="${CC_BEGIN}${CF_LPURPLE}m${CC_END}"
+FG_CYAN="${CC_BEGIN}0;${CF_CYAN}m${CC_END}"
+FG_LCYAN="${CC_BEGIN}${CF_LCYAN}m${CC_END}"
+FG_GRAY="${CC_BEGIN}0;${CF_GRAY}m${CC_END}"
+FG_LGRAY="${CC_BEGIN}${CF_LGRAY}m${CC_END}"
 
-BG_BLACK="${CC_BEGIN}${CB_BLACK}m"
-BG_RED="${CC_BEGIN}${CB_RED}m"
-BG_GREEN="${CC_BEGIN}${CB_GREEN}m"
-BG_YELLOW="${CC_BEGIN}${CB_YELLOW}m"
-BG_BLUE="${CC_BEGIN}${CB_BLUE}m"
-BG_PURPLE="${CC_BEGIN}${CB_PURPLE}m"
-BG_CYAN="${CC_BEGIN}${CB_CYAN}m"
-BG_GRAY="${CC_BEGIN}${CB_GRAY}m"
+BG_BLACK="${CC_BEGIN}${CB_BLACK}m${CC_END}"
+BG_RED="${CC_BEGIN}${CB_RED}m${CC_END}"
+BG_GREEN="${CC_BEGIN}${CB_GREEN}m${CC_END}"
+BG_YELLOW="${CC_BEGIN}${CB_YELLOW}m${CC_END}"
+BG_BLUE="${CC_BEGIN}${CB_BLUE}m${CC_END}"
+BG_PURPLE="${CC_BEGIN}${CB_PURPLE}m${CC_END}"
+BG_CYAN="${CC_BEGIN}${CB_CYAN}m${CC_END}"
+BG_GRAY="${CC_BEGIN}${CB_GRAY}m${CC_END}"
 
 function color_fg
 {
@@ -169,22 +170,8 @@ function color_bg
    return 0
 }
 
-function color_wrap
-{
-   _colors="$1"
-   _message="${@:2}"
-
-   if [ -z "$_colors" ]; then
-      echo $_message
-   else
-      echo "${_colors}${_message}${CC_TERMINATE}"
-   fi
-
-   return 0
-}
-
 function color_strip
 {
-   echo "$@" | sed -r -e "$(printf 's/\e\\[[0-9m;]+//g')"
+   echo "$@" | sed -r -e 's/\\e//g'
    return $?
 }

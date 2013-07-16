@@ -1,0 +1,49 @@
+#!/bin/bash
+
+if [ -n "$ORK_PROC_SOURCED" ]; then return 0; fi
+ORK_PROC_SOURCED=1
+
+source orkhideya
+source ork.stdlib
+
+PROC_PID="$ORK_VAR/pid"
+
+function proc_silent
+{
+   "$@" &>/dev/null
+   return $?
+}
+
+function proc_background
+{
+   proc_silent "$@" &
+   echo "$!"
+   return 0
+}
+
+function proc_daemonize
+{
+   _category="$1"
+   _pid="$(proc_background "${@:2}")"
+
+   if [ -z "$_category" ]; then
+      proc_kill $_pid
+      return 1
+   fi
+
+   mkdir -p "$PROC_PID/$_category"
+   echo "${@:2}" > "$PROC_PID/$_category/$_pid"
+
+   echo "$_pid"
+   return 0
+}
+
+function proc_kill
+{
+   _pid="$1"
+
+   proc_silent find "$PROC_PID" -name "$_pid" -exec rm {} \;
+
+   proc_silent kill -9 $_pid
+   return $?
+}

@@ -1,13 +1,11 @@
 #!/bin/bash
 
-if [ -n "$ORK_ROOT_SOURCED" ]; then return 0; fi
-export ORK_ROOT_SOURCED=1
-
 source orkhideya
 source ork.stdout
+source ork.stdlib
 
 if [ "$(id -u)" != "0" ]; then
    stdout_warning Root is required to continue.
-   sudo -E -- "$0" "$@"
+   sudo -E -- "$0" "$@" 
    exit $?
 fi

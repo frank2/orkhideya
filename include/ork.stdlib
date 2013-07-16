@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ -n "$ORK_STDLIB_SOURCED" ]; then return 0; fi
-export ORK_STDLIB_SOURCED=1
+ORK_STDLIB_SOURCED=1
 
 source orkhideya
 source ork.stdout
@@ -9,10 +9,11 @@ source ork.stdout
 function stdlib_trap
 {
    "$@"
+   _status="$?"
 
-   if [ "$?" != "0" ]; then
-      stdout_error "Execution failed (status: $?)."
-      exit $?
+   if [ "$_status" != "0" ]; then
+      stdout_error "Execution failed (status: $_status)."
+      exit $_status
    fi
 
    return 0
@@ -28,4 +29,17 @@ function stdlib_config
 
    source "$_config"
    return 0
+}
+
+function stdlib_isroot
+{
+   test "$(id -u)" == 0
+   return $?
+}
+
+function stdlib_defined
+{
+   _object="$1"
+   type $_object 2>/dev/null | grep -q 'shell function'
+   return $?
 }

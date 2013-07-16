@@ -1,0 +1,87 @@
+#!/bin/bash
+
+if [ -n "$ORK_NET_SOURCED" ]; then return 0; fi
+ORK_NET_SOURCED=1
+
+source orkhideya
+source ork.stdlib
+
+function net_exists
+{
+   _interface="$1"
+   test -n "$(ifconfig -a | grep "^${_interface}:")"
+   return $?
+}
+
+function net_downup
+{
+   _interface="$1"
+   _downup="$2"
+
+   if [ "$_downup" != "down" -a "$_downup" != "up" ]; then
+      return 1
+   fi
+
+   ifconfig "$_interface" $_downup
+   return $?
+}
+
+function net_down
+{
+   _interface="$1"
+   net_downup "$_interface" down
+   return $?
+}
+
+function net_up
+{
+   _interface="$1"
+   net_downup "$_interface" up
+   return $?
+}
+
+function net_haslink
+{
+   _interface="$1"
+   _carrier="/sys/class/net/$_interface/carrier"
+
+   if [ "$(net_exists $_interface)" != "0" ]; then return 1; fi
+   test -r "$_carrier" -a "$(cat "$_carrier" 2>/dev/null)" == "1"
+   return $?
+}
+
+function net_address_inet
+{
+   _interface="$1"
+
+   if [ ! "net_exists "$_interface"" ]; then
+      return 1
+   fi
+
+   ifconfig $_interface | grep -P 'inet\s+\d+\.\d+\.\d+\.\d+' | awk '{ print $2 }'
+   return 0
+}
+
+function net_address_netmask
+{
+   _interface="$1"
+
+   if [ ! "net_exists "$_interface"" ]; then
+      return 1
+   fi
+
+   ifconfig $_interface | grep -P 'netmask\s+\d+\.\d+\.\d+\.\d+' | awk '{ print $2 }'
+   return 0
+}
+
+function net_address_broadcast
+{
+   _interface="$1"
+
+   if [ ! "net_exists "$_interface"" ]; then
+      return 1
+   fi
+
+   ifconfig $_interface | grep -P 'broadcast\s+\d+\.\d+\.\d+\.\d+' | awk '{ print $2 }'
+   return 0
+}

@@ -1,11 +1,10 @@
 #!/bin/bash
 
 if [ -n "$ORK_STDOUT_SOURCED" ]; then return 0; fi
-export ORK_STDOUT_SOURCED=1
+ORK_STDOUT_SOURCED=1
 
 source orkhideya
 source ork.colors
-source ork.stdlib
 
 function stdout_color
 {
@@ -46,12 +45,20 @@ function stdout_color
       "desperate")
          _color="$STDOUT_COLOR_DESPERATE"
          ;;
+      "terminate")
+         _color="$CC_TERMINATE"
+         ;;
       *)
          return 1
          ;;
    esac
 
-   color_wrap "$_color" "$_message"
+   if [ "$_color" == "$CC_TERMINATE" ]; then
+      echo $_color
+   else
+      echo "${_color}${_message}"
+   fi
+
    return 0
 }
 
@@ -68,18 +75,6 @@ function stdout_width
    return 0
 }
 
-function stdout_truncate
-{
-   _length="$1"
-   _input="${@:2}"
-
-   _color_compensation="$(color_strip "$_input")"
-   _length="$(($_length + ( ${#_input} - ${#color_compensation} ) ))"
-
-   echo "${_input:0:$_length}"
-   return 0
-}
-
 function stdout_printf
 {
    _format="$1"
@@ -93,9 +88,9 @@ function stdout_puts
    _output="$@"
 
    if [ "$(stdout_isterm)" == "0" ]; then
-      echo "$(stdout_truncate "$(stdout_width)" "$_output")" 1>&2
+      echo "$_output"
    else
-      echo "$(color_strip "$_output")" 1>&2
+      echo "$(color_strip "$_output")"
    fi
 }
 
@@ -152,7 +147,7 @@ function stdout_prompt
 {
    _prompt="$@"
    stdout_warning "$_prompt"
-   stdout_printf "%s%s" "$STDOUT_PROMPT" ' '
+   stdout_printf "%s" "$STDOUT_PROMPT"
    read _response
    _status="$?"
 
@@ -160,7 +155,7 @@ function stdout_prompt
       echo $_response
    fi
 
-   return
+   return $_status
 }
 
 # define the defaults of the theme and allow them to be overridden by the user's
@@ -201,6 +196,3 @@ STDOUT_INDICATOR_ERROR="$(stdout_color attention '!')"
 
 # prompt
 STDOUT_PROMPT="$(stdout_color attention '>')"
-
-# allow the user's theme to overwrite the variables
-stdlib_config stdout

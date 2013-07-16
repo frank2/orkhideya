@@ -1,13 +1,14 @@
 #!/bin/bash
 
 if [ -n "$ORK_SOURCED" ]; then return 0; fi
-export ORK_SOURCED=1
+ORK_SOURCED=1
 
 # ascii tbd
-_executor="$(echo $0 | awk -F '/' '{ print $NF }')"
 
 # orkhideya needs to be sourced to work properly
-if [ "$_executor" == "orkhideya"  ]; then
+_executor="$(echo $0 | awk -F '/' '{ print $NF }')"
+
+if [ "$_executor" == "orkhideya" ]; then
    echo "$_executor: not being sourced" 1>&2
    exit 1
 fi
@@ -19,11 +20,15 @@ ORK_ROOT="/usr/local/lib/orkhideya"
 ORK_ETC="etc"
 ORK_INCLUDE="include"
 ORK_BIN="bin"
+ORK_VAR="var"
+ORK_TMP="tmp"
 
-# allow the user to override these variables, but prefer a system-wide solution
+# allow these base variables to be overwritten by the system or user
 if [ -r "/etc/orkhideya" ]; then
    source /etc/orkhideya
-elif [ -r "$HOME/.orkhideya" ]; then
+fi
+
+if [ -r "$HOME/.orkhideya" ]; then
    source $HOME/.orkhideya
 fi
 
@@ -56,6 +61,11 @@ fi
 
 if [ ! -d "$ORK_BIN" ]; then
    echo "$_executor: orkhideya: bad bin directory: $ORK_BIN" 1>&2
+   return 1
+fi
+
+if [ ! -d "$ORK_TMP" ]; then
+   echo "$_executor: orkhideya: bad tmp directory: $ORK_TMP" 1>&2
    return 1
 fi
 
