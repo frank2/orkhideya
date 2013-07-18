@@ -1,8 +1,7 @@
 #!/bin/bash
 
 source orkhideya
-source ork.stdout
-source ork.stdlib
+ork_include stdout
 
 if [ "$(id -u)" != "0" ]; then
    stdout_warning Root is required to continue.

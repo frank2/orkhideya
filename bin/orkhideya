@@ -1,75 +1,155 @@
 #!/bin/bash
 
-if [ -n "$ORK_SOURCED" ]; then return 0; fi
-ORK_SOURCED=1
+EXECUTOR="$(echo $0 | awk -F '/' '{ print $NF }')"
+
+# some Ron Pauls to start us out
+function ork_pathcat
+{
+   _root="$(ork_pathroot root)"
+
+   for _path in $@; do
+      if [ "${_path:0:1}" == '/' ]; then
+         _root="$_path"
+      else
+         _root="$_root/$_path"
+      fi
+   done
+
+   echo "$_root"
+   return 0
+}
+
+function ork_pathroot
+{
+   _pathroot="$1"
+
+   case "$_pathroot" in
+      root)
+         echo $ORK_ROOT
+         ;;
+      include)
+         ork_pathcat $ORK_INCLUDE
+         ;;
+      etc)
+         ork_pathcat $ORK_ETC
+         ;;
+      bin)
+         ork_pathcat $ORK_BIN
+         ;;
+      var)
+         ork_pathcat $ORK_VAR
+         ;;
+      tmp)
+         ork_pathcat $ORK_TMP
+         ;;
+      *)
+         return 1
+   esac
+
+   return 0
+}
+
+function ork_verify
+{
+   _library="$1"
+   _filename="$(ork_pathroot include)/ork.$_library"
+
+   if [ ! -r "$_filename" ]; then 
+      echo "$EXECUTOR: orkhideya: bad library (fatal): $_library" 1>&2
+      exit 1
+   fi
+
+   return 0
+}
+
+function ork_configpath
+{
+   _library="$1"
+   ork_verify "$_library"
+
+   echo "$(ork_pathroot etc)/$_library"
+   return 0
+}
+
+function ork_reconfigure
+{
+   _library="$1"
+   ork_verify "$_library"
+
+   _config="$(ork_configpath $_library)/config"
+
+   if [ -r "$_config" ]; then
+      source "$_config"
+      return $?
+   fi
+
+   return 0
+}
+
+function ork_include
+{
+   _library="$1"
+
+   if [ "$_library" == "-" ]; then
+      for _file in $(find "$(ork_pathroot include)" -name "ork.*" -type f); do
+         _library="$(echo $_file | awk -F '/' '{ print $NF }' | sed -e 's/^ork\.//g')"
+         ork_include _library
+         _status="$?"
+
+         if [ "$_status" != "0" ]; then
+            return "$_status"
+         fi
+      done
+      return 0
+   fi
+
+   _filename="$(ork_pathroot include)/ork.$_library"
+
+   if [ ! -r "$_filename" ]; then
+      echo "$EXECUTOR: orkhideya: bad include (fatal): $_library ($_filename)" 1>&2
+      exit 1
+   fi
+
+   # quit cleanly when we run into something we've already sourced
+   if echo "$ORK_INCLUDE_PATH" | grep -q ":$_filename"; then return 0; fi
+
+   ORK_INCLUDE_PATH="$ORK_INCLUDE_PATH:$_filename"
+   source $_filename
+
+   if [ "$?" != "0" ]; then
+      echo "$EXECUTOR: orkhideya: inclusion failure (fatal): $_library ($_filename)" 1>&2
+      exit 1
+   fi
+
+   ork_reconfigure $_library
+   return 0
+}
 
 # ascii tbd
-
-# orkhideya needs to be sourced to work properly
-_executor="$(echo $0 | awk -F '/' '{ print $NF }')"
-
-if [ "$_executor" == "orkhideya" ]; then
-   echo "$_executor: not being sourced" 1>&2
-   exit 1
-fi
-
-# the root of the orkhideya installation
+# modify this variable if you care about where things go
 ORK_ROOT="/usr/local/lib/orkhideya"
 
 # modify these variables if you care a lot more about where things go
-ORK_ETC="etc"
 ORK_INCLUDE="include"
+ORK_ETC="etc"
 ORK_BIN="bin"
 ORK_VAR="var"
 ORK_TMP="tmp"
 
 # allow these base variables to be overwritten by the system or user
-if [ -r "/etc/orkhideya" ]; then
+if [ -f "/etc/orkhideya" -a -r "/etc/orkhideya" ]; then
    source /etc/orkhideya
 fi
 
-if [ -r "$HOME/.orkhideya" ]; then
-   source $HOME/.orkhideya
+if [ -f "$HOME/.orkhideya" -a -r "$HOME/.orkhideya" ]; then
+   source "$HOME/.orkhideya"
 fi
 
-if [ "${ORK_ETC:0:1}" != "/" ]; then
-   ORK_ETC="$ORK_ROOT/$ORK_ETC"
-fi
+for _path in include etc var tmp; do
+   _pathroot="$(ork_pathroot $_path)"
 
-if [ "${ORK_INCLUDE:0:1}" != "/" ]; then
-   ORK_INCLUDE="$ORK_ROOT/$ORK_INCLUDE"
-fi
-
-if [ "${ORK_BIN:0:1}" != "/" ]; then
-   ORK_BIN="$ORK_ROOT/$ORK_BIN"
-fi
-
-if [ ! -d "$ORK_ROOT" ]; then
-   echo "$_executor: orkhideya: bad root: $ORK_ROOT" 1>&2
-   return 1
-fi
-
-if [ ! -d "$ORK_ETC" ]; then
-   echo "$_executor: orkhideya: bad config directory: $ORK_ETC" 1>&2
-   return 1
-fi
-
-if [ ! -d "$ORK_INCLUDE" ]; then
-   echo "$_executor: orkhideya: bad include directory: $ORK_INCLUDE" 1>&2
-   return 1
-fi
-
-if [ ! -d "$ORK_BIN" ]; then
-   echo "$_executor: orkhideya: bad bin directory: $ORK_BIN" 1>&2
-   return 1
-fi
-
-if [ ! -d "$ORK_TMP" ]; then
-   echo "$_executor: orkhideya: bad tmp directory: $ORK_TMP" 1>&2
-   return 1
-fi
-
-# for e-z sourcing, we need to modify the path!
-if [ -z "$(echo $PATH | grep ":$ORK_INCLUDE")" ]; then
-   PATH="$PATH:$ORK_INCLUDE"
-fi
+   if [ ! -d "$_pathroot" ]; then
+      echo "$EXECUTOR: orkhideya: bad root for $_path: $_pathroot" 1>&2
+      return 1
+   fi
+done

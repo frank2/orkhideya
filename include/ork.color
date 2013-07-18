@@ -1,10 +1,5 @@
 #!/bin/bash
 
-if [ -n "$ORK_COLORS_SOURCED" ]; then return 0; fi
-ORK_COLORS_SOURCED=1
-
-source orkhideya
-
 C_BOLD="1"
 
 CF_BLACK="30"
@@ -172,6 +167,12 @@ function color_bg
 
 function color_strip
 {
-   echo "$@" | sed -r -e 's/\\e//g'
+   echo "$@" | sed -r -e "s/\\\[\\\e\[[0-9;m]+\\\]//g"
+   return $?
+}
+
+function color_render
+{
+   echo "$@" | sed -r -e "s/\\\e/$(printf "\e")/g" -e 's/\\\[//g' -e 's/\\]//g'
    return $?
 }

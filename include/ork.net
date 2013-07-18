@@ -1,16 +1,93 @@
 #!/bin/bash
 
-if [ -n "$ORK_NET_SOURCED" ]; then return 0; fi
-ORK_NET_SOURCED=1
-
 source orkhideya
-source ork.stdlib
+ork_include stdlib
 
 function net_exists
 {
    _interface="$1"
    test -n "$(ifconfig -a | grep "^${_interface}:")"
    return $?
+}
+
+function net_ipv4mask
+{
+   _size="$1"
+   if [ "$_size" -lt 0 -o "$_size" -gt 32 ]; then return 1; fi
+
+   _inversion="$((32 - $_size))"
+
+   echo "$(( (2 ** $_size - 1) << $_inversion ))"
+   return 0
+}
+
+function net_isup
+{
+   _interface="$1"
+   ifconfig -s | tail -n+2 | grep -q "^${_interface}"
+   return $?
+}
+
+function net_isipv4
+{
+   _address="$1"
+
+   echo $_address | grep -q -P '((\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
+   return $?
+}
+
+function net_iscidr
+{
+   _address="$1"
+   if ! ( echo "$_address" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_address")" -gt 1 ]; then return 1; fi
+
+   _network="$(echo "$_address" | awk -F '/' '{ print $2 }')"
+   if ! ( echo $_network | grep -q '^[0-9]+$' ); then return 2; fi
+
+   net_isipv4 "$_address" && [ "$_network" -ge "0" -a "$_network" -le "32" ];
+   return $?
+}
+
+function net_ipv4toint
+{
+   _address="$1"
+   _number="0"
+
+   if ! net_isipv4 "$_address"; then return 1; fi
+
+   for _chunk in $(seq 1 4); do
+      _octet="$(echo "$_address" | awk -F '.' "{ print \$$_chunk }")"
+      _number="$(($_number | ($_octet << 32 - (8 * $_chunk))))"
+   done
+
+   echo $_number
+   return 0
+}
+
+function net_inttoipv4
+{
+   _number="$(stdlib_tolower "$1")"
+
+   if echo $_number | grep -q '^[0-9a-f]$'; then
+      _number="$(($_number))"
+   elif echo $_number | grep -q '[^0-9]'; then
+      return 1
+   fi
+
+   if [ "$_number" -lt "0" -o "$_number" -gt "$(net_ipv4mask 32)" ]; then return 2; fi
+
+   _address=""
+
+   for _chunk in $(seq 1 4); do
+      if [ -n "$_address" ]; then
+         _address="${_address}."
+      fi
+
+      _address="${_address}$(( ($_number >> (32 - ($_chunk * 8))) & 0xFF ))"
+   done
+
+   echo "$_address"
+   return 0
 }
 
 function net_downup
@@ -45,43 +122,48 @@ function net_haslink
    _interface="$1"
    _carrier="/sys/class/net/$_interface/carrier"
 
-   if [ "$(net_exists $_interface)" != "0" ]; then return 1; fi
+   if ! ( net_exists "$_interface" ); then return 1; fi
    test -r "$_carrier" -a "$(cat "$_carrier" 2>/dev/null)" == "1"
    return $?
 }
 
-function net_address_inet
+function net_address_canacquire
+{
+   _family="$1"
+
+   case "$_family" in
+      unix|inet|inet6|ax25|netrom|rose|ipx|ddp|ec|ash|x25|netmask|broadcast)
+         return 0
+         ;;
+      *)
+         return 1
+         ;;
+   esac
+}
+
+function net_address_get
 {
    _interface="$1"
+   _family="$2"
 
-   if [ ! "net_exists "$_interface"" ]; then
-      return 1
-   fi
+   if ! net_address_canacquire "$_family"; then return 1; fi
+   if ! net_exists "$_interface"; then return 2; fi
 
-   ifconfig $_interface | grep -P 'inet\s+\d+\.\d+\.\d+\.\d+' | awk '{ print $2 }'
+   ifconfig "$_interface" | grep -o -P "$_family\s+.*" | awk '{ print $2 }'
+   if [ "$?" != "0" ]; then return 3; fi
    return 0
 }
 
-function net_address_netmask
+function net_address_set
 {
    _interface="$1"
+   _family="$2"
+   _address="$3"
 
-   if [ ! "net_exists "$_interface"" ]; then
-      return 1
-   fi
+   if ! net_address_canacquire "$_family"; then return 1; fi
+   if ! net_exists "$_interface"; then return 2; fi
 
-   ifconfig $_interface | grep -P 'netmask\s+\d+\.\d+\.\d+\.\d+' | awk '{ print $2 }'
-   return 0
-}
-
-function net_address_broadcast
-{
-   _interface="$1"
-
-   if [ ! "net_exists "$_interface"" ]; then
-      return 1
-   fi
-
-   ifconfig $_interface | grep -P 'broadcast\s+\d+\.\d+\.\d+\.\d+' | awk '{ print $2 }'
+   ifconfig "$_interface" "$_family" "$_address"
+   if [ "$?" != "0" ]; then return 3; fi
    return 0
 }

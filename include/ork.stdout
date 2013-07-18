@@ -1,49 +1,45 @@
 #!/bin/bash
 
-if [ -n "$ORK_STDOUT_SOURCED" ]; then return 0; fi
-ORK_STDOUT_SOURCED=1
-
-source orkhideya
-source ork.colors
+ork_include color
 
 function stdout_color
 {
-   _color="$1"
-   _message="${@:2}"
+   local _color="$1"
+   local _message="${@:2}"
 
    case "$_color" in
       "attention")
-         _color="$STDOUT_COLOR_ATTENTION"
+         _color="$ORK_STDOUT_COLOR_ATTENTION"
          ;;
       "decorative")
-         _color="$STDOUT_COLOR_DECORATIVE"
+         _color="$ORK_STDOUT_COLOR_DECORATIVE"
          ;;
       "alternate")
-         _color="$STDOUT_COLOR_ALTERNATE"
+         _color="$ORK_STDOUT_COLOR_ALTERNATE"
          ;;
       "window")
-         _color="$STDOUT_COLOR_WINDOW"
+         _color="$ORK_STDOUT_COLOR_WINDOW"
          ;;
       "warning")
-         _color="$STDOUT_COLOR_WARNING"
+         _color="$ORK_STDOUT_COLOR_WARNING"
          ;;
       "text")
-         _color="$STDOUT_COLOR_TEXT"
+         _color="$ORK_STDOUT_COLOR_TEXT"
          ;;
       "main")
-         _color="$STDOUT_COLOR_MAIN"
+         _color="$ORK_STDOUT_COLOR_MAIN"
          ;;
       "main-focused")
-         _color="$STDOUT_COLOR_MAIN_FOCUSED"
+         _color="$ORK_STDOUT_COLOR_MAIN_FOCUSED"
          ;;
       "main-unfocused")
-         _color="$STDOUT_COLOR_MAIN_UNFOCUSED"
+         _color="$ORK_STDOUT_COLOR_MAIN_UNFOCUSED"
          ;;
       "normal")
-         _color="$STDOUT_COLOR_NORMAL"
+         _color="$ORK_STDOUT_COLOR_NORMAL"
          ;;
       "desperate")
-         _color="$STDOUT_COLOR_DESPERATE"
+         _color="$ORK_STDOUT_COLOR_DESPERATE"
          ;;
       "terminate")
          _color="$CC_TERMINATE"
@@ -62,6 +58,15 @@ function stdout_color
    return 0
 }
 
+function stdout_color_wrap
+{
+   local _color="$1"
+   local _message="${@:2}"
+
+   echo "$(stdout_color "$_color" "$_message")$(stdout_color terminate)"
+   return 0
+}
+
 function stdout_isterm
 {
    test -t 2
@@ -72,41 +77,41 @@ function stdout_isterm
 function stdout_width
 {
    tput cols
-   return 0
+   return $?
 }
 
 function stdout_printf
 {
-   _format="$1"
-   _args="${@:2}"
+   local _format="$1"
+   local _args="${@:2}"
    printf "$_format" "$_args" 1>&2
    return 0
 }
 
 function stdout_puts
 {
-   _output="$@"
+   local _output="$@"
 
    if [ "$(stdout_isterm)" == "0" ]; then
-      echo "$_output"
+      echo "$(color_render "$_output")" 1>&2
    else
-      echo "$(color_strip "$_output")"
+      echo "$(color_strip "$_output")" 1>&2
    fi
 }
 
 function stdout_indicator
 {
-   _indicator="$1"
+   local _indicator="$1"
 
    case "$_indicator" in
       "warning")
-         echo "${STDOUT_INDICATOR_PREFIX}${STDOUT_INDICATOR_WARNING}${STDOUT_INDICATOR_SUFFIX}"
+         echo "${ORK_STDOUT_INDICATOR_PREFIX}${ORK_STDOUT_INDICATOR_WARNING}${ORK_STDOUT_INDICATOR_SUFFIX}"
          ;;
       "error")
-         echo "${STDOUT_INDICATOR_PREFIX}${STDOUT_INDICATOR_ERROR}${STDOUT_INDICATOR_SUFFIX}"
+         echo "${ORK_STDOUT_INDICATOR_PREFIX}${ORK_STDOUT_INDICATOR_ERROR}${ORK_STDOUT_INDICATOR_SUFFIX}"
          ;;
       *)
-         echo "${STDOUT_INDICATOR_PREFIX}${STDOUT_INDICATOR_NORMAL}${STDOUT_INDICATOR_SUFFIX}"
+         echo "${ORK_STDOUT_INDICATOR_PREFIX}${ORK_STDOUT_INDICATOR_NORMAL}${ORK_STDOUT_INDICATOR_SUFFIX}"
          ;;
    esac
 
@@ -115,41 +120,41 @@ function stdout_indicator
 
 function stdout_status
 {
-   _status="$1"
-   _message="${@:2}"
+   local _status="$1"
+   local _message="${@:2}"
 
-   stdout_puts "${STDOUT_STATUS_PREFIX} $(stdout_indicator $_status) $(stdout_color main-focused "$STDOUT_STATUS_EXECUTOR")${STDOUT_STATUS_SUFFIX} $_message"
+   stdout_puts "${ORK_STDOUT_STATUS_PREFIX} $(stdout_indicator $_status) $(stdout_color main-focused "$ORK_STDOUT_STATUS_EXECUTOR")${ORK_STDOUT_STATUS_SUFFIX} $_message"
    return 0
 }
 
 function stdout_normal
 {
-   _message="$@"
+   local _message="$@"
    stdout_status normal "$_message"
    return 0
 }
 
 function stdout_warning
 {
-   _message="$@"
+   local _message="$@"
    stdout_status warning "$_message"
    return 0
 }
 
 function stdout_error
 {
-   _message="$@"
+   local _message="$@"
    stdout_status error "$_message"
    return 0
 }
 
 function stdout_prompt
 {
-   _prompt="$@"
+   local _prompt="$@"
    stdout_warning "$_prompt"
-   stdout_printf "%s" "$STDOUT_PROMPT"
+   stdout_printf "%s" "$ORK_STDOUT_PROMPT"
    read _response
-   _status="$?"
+   local _status="$?"
 
    if [ "$_status" == "0" ]; then
       echo $_response
@@ -158,41 +163,38 @@ function stdout_prompt
    return $_status
 }
 
-# define the defaults of the theme and allow them to be overridden by the user's
-# bash theme
-
 # theme colors
-STDOUT_COLOR_ATTENTION="$(color_fg lightcyan)"
-STDOUT_COLOR_DECORATIVE="$(color_fg purple)"
-STDOUT_COLOR_ALTERNATE="$(color_fg cyan)"
-STDOUT_COLOR_WINDOW="$(color_fg lightcyan)"
-STDOUT_COLOR_WARNING="$(color_fg lightcyan)"
-STDOUT_COLOR_TEXT="$(color_fg lightpurple)"
-STDOUT_COLOR_NORMAL="$(color_fg lightcyan)"
-STDOUT_COLOR_MAIN="$(color_fg lightpurple)"
-STDOUT_COLOR_MAIN_FOCUSED="$(color_fg lightpurple)"
-STDOUT_COLOR_MAIN_UNFOCUSED="$(color_fg purple)"
-STDOUT_COLOR_DESPERATE="$(color_fg lightcyan)"
+ORK_STDOUT_COLOR_ATTENTION="$(color_fg lightcyan)"
+ORK_STDOUT_COLOR_DECORATIVE="$(color_fg purple)"
+ORK_STDOUT_COLOR_ALTERNATE="$(color_fg cyan)"
+ORK_STDOUT_COLOR_WINDOW="$(color_fg lightcyan)"
+ORK_STDOUT_COLOR_WARNING="$(color_fg lightcyan)"
+ORK_STDOUT_COLOR_TEXT="$(color_fg lightpurple)"
+ORK_STDOUT_COLOR_NORMAL="$(color_fg lightcyan)"
+ORK_STDOUT_COLOR_MAIN="$(color_fg lightpurple)"
+ORK_STDOUT_COLOR_MAIN_FOCUSED="$(color_fg lightpurple)"
+ORK_STDOUT_COLOR_MAIN_UNFOCUSED="$(color_fg purple)"
+ORK_STDOUT_COLOR_DESPERATE="$(color_fg lightcyan)"
 
 # status prefix and suffix
-STDOUT_STATUS_PREFIX="$(stdout_color normal ']')"
-STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX}$(stdout_color warning ']')"
-STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX} $(stdout_color main 'ORKH')"
-STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX}$(stdout_color attention 'i')"
-STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX}$(stdout_color main 'DEYA')"
-STDOUT_STATUS_PREFIX="${STDOUT_STATUS_PREFIX}$(stdout_color decorative ']')"
+ORK_STDOUT_STATUS_PREFIX="$(stdout_color normal ']')"
+ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX}$(stdout_color warning ']')"
+ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX} $(stdout_color main 'ORKH')"
+ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX}$(stdout_color attention 'i')"
+ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX}$(stdout_color main 'DEYA')"
+ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX}$(stdout_color decorative ']')"
 
-STDOUT_STATUS_EXECUTOR="$(echo $0 | awk -F '/' '{ print $NF }')"
+ORK_STDOUT_STATUS_EXECUTOR="$(echo $0 | awk -F '/' '{ print $NF }')"
 
-STDOUT_STATUS_SUFFIX="$(stdout_color decorative '>')"
+ORK_STDOUT_STATUS_SUFFIX="$(stdout_color_wrap decorative '>')"
 
 # indicators
-STDOUT_INDICATOR_PREFIX="$(stdout_color decorative '[')"
-STDOUT_INDICATOR_SUFFIX="$(stdout_color decorative ']')"
+ORK_STDOUT_INDICATOR_PREFIX="$(stdout_color decorative '[')"
+ORK_STDOUT_INDICATOR_SUFFIX="$(stdout_color decorative ']')"
 
-STDOUT_INDICATOR_NORMAL="$(stdout_color normal '+')"
-STDOUT_INDICATOR_WARNING="$(stdout_color warning '?')"
-STDOUT_INDICATOR_ERROR="$(stdout_color attention '!')"
+ORK_STDOUT_INDICATOR_NORMAL="$(stdout_color normal '+')"
+ORK_STDOUT_INDICATOR_WARNING="$(stdout_color warning '?')"
+ORK_STDOUT_INDICATOR_ERROR="$(stdout_color attention '!')"
 
 # prompt
-STDOUT_PROMPT="$(stdout_color attention '>')"
+ORK_STDOUT_PROMPT="$(stdout_color attention '>')"

@@ -1,0 +1,159 @@
+#!/bin/bash
+
+ork_include stdlib
+ork_include stdout
+
+function ssh_site_root
+{
+   ork_pathcat "$(ork_pathroot etc)" "$ORK_SSH_ORKCONFIG" "$ORK_SSH_SITEPATH"
+   return 0
+}
+
+function ssh_site_path
+{
+   _site="$1"
+   echo "$(ssh_site_root)/$(stdlib_pathify "$_site")"
+   return 0
+}
+
+function ssh_key_root
+{
+   ork_pathcat "$(ork_pathroot etc)" "$ORK_SSH_ORKCONFIG" "$ORK_SSH_KEYPATH"
+   return 0
+}
+
+function ssh_key_path
+{
+   _site="$1"
+   echo "$(ssh_key_root)/$(stdlib_pathify "$_site")"
+   return 0
+}
+
+function ssh_site_exists
+{
+   _site="$1"
+   test -d "$(ssh_site_path $_site)"
+   return $?
+}
+
+function ssh_site_config
+{
+   _site="$1"
+   if ! ssh_site_exists "$_site"; then return 1; fi
+
+   echo "$(ssh_site_path $_site)/config"
+   return 0
+}
+
+function ssh_key_file
+{
+   _site="$1"
+   if ! ssh_site_exists "$_site"; then return 1; fi
+
+   echo "$(ssh_key_path $_site)/$ORK_SSH_KEYFILE"
+   return 0
+}
+
+function ssh_site_create
+{
+   _site="$1"
+   if ssh_site_exists "$_site"; then return 1; fi
+   if ! mkdir -p "$(ssh_site_path $_site)"; then return 2; fi
+
+   _config_file="$(ssh_site_config $_site)"
+   if ! touch "$_config_file"; then return 3; fi
+
+   echo "# ORKHiDEYA config for site "$_site"" > "$_config_file"
+   stdlib_edit "$_config_file"
+   return $?
+}
+
+function ssh_key_gen
+{
+   _site="$1"
+   _arguments="${@:2}"
+
+   if [ "$_site" == "-" ]; then
+      stdout_warning "Site argument is blank. This will generate a default key."
+      _site=""
+   elif ! ssh_site_exists "$_site"; then 
+      return 1
+   fi
+
+   _key_file="$(ssh_key_file "$_site")"
+
+   if [ -e "$_key_file" ]; then return 2; fi
+
+   if [ -z "$_arguments" ] || ! echo "$_arguments" | grep -q -P "(^-f|\s+-f)"; then
+      _arguments="$_arguments -f "$_key_file""
+   fi
+
+   if [ ! -d "$(ssh_key_path "$_site")" ]; then
+      if ! mkdir -p "$(ssh_key_path "$_site")"; then return 3; fi
+   fi
+
+   stdout_warning "Running $(stdout_color_wrap main-focused ssh-keygen "$_arguments")."
+   ssh-keygen $_arguments
+   _status="$?"
+
+   if [ "$_status" != "0" ]; then
+      stdout_error "ssh-keygen failed (status: $_status)"
+      if [ -e "$_key_file" ]; then shred -u "$_key_file"; fi
+      return 4
+   fi
+
+   return 0
+}
+
+function ssh_key_exchange
+{
+   _site="$1"
+   _authfile="$2"
+
+   if [ -z "$_authfile" ]; then
+   fi
+}
+
+function ssh_site_keys
+{
+   _site="$1"
+
+   if [ "$_site" == "-" ]; then
+      stdout_warning "Site argument is blank. This will only return the default key."
+      _site=""
+   elif ! ssh_site_exists "$_site"; then 
+      return 1
+   fi
+
+   _keys=""
+   _root="$(ssh_key_root)"
+
+   if [ -z "$_site" ]; then
+      _keypath='/'
+   else
+      _keypath="$(stdlib_pathify "$_site")"
+   fi
+
+   while [ -n "$_keypath" ]; do
+      _keyfile="$_root/$_keypath/$ORK_SSH_KEYFILE"
+
+      if [ -r "$_keyfile" ]; then
+         if [ -z "$_keys" ]; then
+            _keys="$_keyfile"
+         else
+            _keys="$_keys:$_keyfile"
+         fi
+      fi
+      
+      _keypath="$(stdlib_cdup "$_keypath")"
+   done
+
+   echo "$_keys"
+   return 0
+}
+
+ORK_SSH_ORKCONFIG="ssh"
+ORK_SSH_SSHCONFIG="$HOME/.ssh"
+ORK_SSH_KEYFILE="id_rsa"
+ORK_SSH_SITEPATH="sites"
+ORK_SSH_KEYPATH="keys"

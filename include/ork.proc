@@ -1,10 +1,7 @@
 #!/bin/bash
 
-if [ -n "$ORK_PROC_SOURCED" ]; then return 0; fi
-ORK_PROC_SOURCED=1
-
 source orkhideya
-source ork.stdlib
+ork_include stdlib
 
 PROC_PID="$ORK_VAR/pid"
 

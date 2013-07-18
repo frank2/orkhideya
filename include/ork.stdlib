@@ -1,10 +1,6 @@
 #!/bin/bash
 
-if [ -n "$ORK_STDLIB_SOURCED" ]; then return 0; fi
-ORK_STDLIB_SOURCED=1
-
-source orkhideya
-source ork.stdout
+ork_include stdout
 
 function stdlib_trap
 {
@@ -12,22 +8,10 @@ function stdlib_trap
    _status="$?"
 
    if [ "$_status" != "0" ]; then
-      stdout_error "Execution failed (status: $_status)."
-      exit $_status
+      stdout_error "Execution failed (status: $_status)"
+      exit 1
    fi
 
-   return 0
-}
-
-function stdlib_config
-{
-   _config="$ORK_ETC/$(echo $1 | sed -e 's,\.,/,g')"
-
-   if [ ! -r "$_config" ]; then
-      return 1
-   fi
-
-   source "$_config"
    return 0
 }
 
@@ -37,9 +21,59 @@ function stdlib_isroot
    return $?
 }
 
-function stdlib_defined
+function stdlib_tolower
 {
-   _object="$1"
-   type $_object 2>/dev/null | grep -q 'shell function'
+   _message="$@"
+   echo $_message | tr '[:upper:]' '[:lower:]'
    return $?
+}
+
+function stdlib_toupper
+{
+   _message="$@"
+   echo $_message | tr '[:lower:]' '[:upper:]'
+   return $?
+}
+
+function stdlib_pathify
+{
+   _configuration="$@"
+   echo "$_configuration" | sed -e 's,\.,/,g'
+   return $?
+}
+
+function stdlib_configify
+{
+   _path="$@"
+   echo "$_path" | sed -e 's,/,.,g'
+   return $?
+}
+
+function stdlib_edit
+{
+   _output_file="$1"
+   $EDITOR "$_output_file"
+   return $?
+}
+
+function stdlib_strcount
+{
+   _needle="$1"
+   _haystack="${@:2}"
+
+   echo $_haystack | grep -o "$_needle" | wc -l
+   return $?
+}
+
+function stdlib_cdup
+{
+   _path="$@"
+   if [ -z "$_path" ]; then return 1; fi
+
+   _last="$(echo $_path | awk -F '/' '{ print $NF }')"
+
+   if echo $_path | grep -q "/$_last$"; then _last="/$_last"; fi
+
+   echo $_path | sed -e "s,${_last}\$,,"
+   return 0
 }
