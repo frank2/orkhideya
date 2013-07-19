@@ -93,7 +93,11 @@ function ork_include
    if [ "$_library" == "-" ]; then
       for _file in $(find "$(ork_pathroot include)" -name "ork.*" -type f); do
          _library="$(echo $_file | awk -F '/' '{ print $NF }' | sed -e 's/^ork\.//g')"
-         ork_include _library
+
+         # root is the only exception. it serves a special purpose.
+         if [ "$_library" == "root" ]; then continue; fi
+
+         ork_include $_library
          _status="$?"
 
          if [ "$_status" != "0" ]; then

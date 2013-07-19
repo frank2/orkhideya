@@ -152,7 +152,7 @@ function stdout_prompt
 {
    local _prompt="$@"
    stdout_warning "$_prompt"
-   stdout_printf "%s" "$ORK_STDOUT_PROMPT"
+   stdout_printf "%s " "$(color_render $ORK_STDOUT_PROMPT)"
    read _response
    local _status="$?"
 
@@ -161,6 +161,24 @@ function stdout_prompt
    fi
 
    return $_status
+}
+
+# TODO expand this into a generic selection thing
+function stdout_prompt_yesno
+{
+   local _prompt="$@"
+   local _response=""
+
+   while [ "$_response" != "y" -a "$_response" != "n" ]; do
+      _response="$(stdlib_tolower "$(stdout_prompt "$_prompt [$(stdout_color_wrap main-focused y)/$(stdout_color_wrap main-focused n)]")")"
+
+      if [ "$_response" != "y" -a "$_response" != "n" ]; then
+         stdout_error "Invalid response."
+      fi
+   done
+   
+   echo "$_response"
+   return 0
 }
 
 # theme colors
@@ -197,4 +215,4 @@ ORK_STDOUT_INDICATOR_WARNING="$(stdout_color warning '?')"
 ORK_STDOUT_INDICATOR_ERROR="$(stdout_color attention '!')"
 
 # prompt
-ORK_STDOUT_PROMPT="$(stdout_color attention '>')"
+ORK_STDOUT_PROMPT="$(stdout_color_wrap attention '>>')"
