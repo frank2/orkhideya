@@ -45,6 +45,16 @@ function ssh_site_config_file
    return 0
 }
 
+function ssh_key_file
+{
+   # an ssh site can exist without a keyfile, but not the other way around.
+   _site="$1"
+   if ! ssh_site_exists "$_site"; then return 1; fi
+   
+   echo "$(ssh_key_root)/$(stdlib_pathify "$_site")/$ORK_SSH_KEYFILE"
+   return 0
+}
+
 function ssh_site_config_build
 {
    local _site="$1"
@@ -70,39 +80,40 @@ function ssh_site_config_build
       local _site_config="$(ssh_site_config_file "$_inferred_host")"
       local _site_key="$(ssh_site_key "$_inferred_host")"
       local _site_host=""
-      local _blank_config="1"
       
       if [ -e "$_site_key" ]; then
          _site_host="$_inferred_host"
       fi
 
-      if [ -e "$_site_config" ]; then
-         if [ -n "$(cat "$_site_config")" ]; then
-            _blank_config="0"
+      if [ -n "$(test -e "$_site_config" && cat "$_site_config")" ]; then
+         local _config_host="$(grep -o -P '^Host\s+(.*)$' "$_site_config" | awk '{ print $2 }')"
 
-            local _config_host="$(grep -o -P '^Host\s+(.*)$' "$_site_config" | awk '{ print $2 }')"
-
-            if [ -n "$_config_host" ]; then
-               _site_host="$_config_host"
-            else
-               _site_host="$(stdlib_configify "${_config_path:1}")"
-            fi
+         if [ -n "$_config_host" ]; then
+            _site_host="$_config_host"
+         else
+            _site_host="$(stdlib_configify "${_config_path:1}")"
          fi
       fi
 
       if [ -n "$_site_host" -a -z "$_config_host" ]; then
          local _occurrences="$(stdlib_strcount "$_config_path" "$_config_paths")"
 
-         if [ "$_occurrences" == "1" -a \( -e "$_site_key" -o "$_blank_config" == "0" \) ]; then
-            echo "Host $_site_host"
-         elif [ \( -e "$_site_key" -a "$_blank_config" == "1" \) -o "$_occurrences" -gt "1" ]; then
-            echo "Host ${_site_host}.*"
+         if [ -e "$_site_key" -o -e "$_site_config" ]; then
+            if [ "$_occurrences" -gt 1 ]; then
+               if [ -n "$(test -e "$_site_config" && grep -o -P '^\s*HostName\s+' "$_site_config")" ]; then
+                  echo "Host ${_site_host}.* $_site_host"
+               else
+                  echo "Host ${_site_host}.*"
+               fi
+            else
+               echo "Host $_site_host"
+            fi
          fi
-      elif [ -z "$_site_host" -a "$_blank_config" == "0" ]; then
+      elif [ -z "$_site_host" -a -z "$_config_host" -a \( -n "$(test -e "$_site_config" && cat "$_site_config")" -o -e "$_site_key" \) ]; then
          echo "Host *"
       fi
 
-      if [ "$_blank_config" == "0" ]; then
+      if [ -n "$(test -e "$_site_config" && cat "$_site_config")" ]; then
          for _line in $(cat "$_site_config"); do
             if ! echo $_line | grep -q -P "^Host\s+"; then
                printf "\t%s\n" "$_line"
@@ -121,6 +132,17 @@ function ssh_site_config_build
 
    IFS=$OLDIFS
    return 0
+}
+
+function ssh_site_config_edit
+{
+   local _site="$1"
+   if ! ssh_site_exists "$_site"; then return 1; fi
+
+   local _config_file="$(ssh_site_config_file "$_site")"
+
+   stdlib_edit "$_config_file"
+   return $?
 }
 
 function ssh_site_config_save
@@ -178,7 +200,7 @@ function ssh_key_gen
       return 1
    fi
 
-   _key_file="$(ssh_site_key "$_site")"
+   _key_file="$(ssh_key_file "$_site")"
 
    if [ -e "$_key_file" ]; then return 2; fi
 
@@ -250,10 +272,16 @@ function ssh_key_select
 function ssh_key_exchange
 {
    local _site="$1"
-   local _remote_ssh_config="$2"
-   if [ -z "$_remote_ssh_config" ]; then _remote_ssh_config="~/.ssh"; fi
+   local _key="$2"
+   
+   if [ -z "$_key" ]; then
+      _key="$(ssh_key_select "$_site").pub"
+   else
+      _key="$(ssh_key_select "$_key").pub"
+   fi
 
-   local _key="$(ssh_key_select "$_site").pub"
+   local _remote_ssh_config="$3"
+   if [ -z "$_remote_ssh_config" ]; then _remote_ssh_config="~/.ssh"; fi
 
    if [ "$?" != "0" ]; then return 1; fi
 
@@ -280,7 +308,7 @@ function ssh_site_key
       _site=""
    fi
 
-   local _keyfile="$(ssh_key_root)/$(stdlib_pathify "$_site")/$ORK_SSH_KEYFILE"
+   local _keyfile="$(ssh_key_file $_site)"
 
    if [ ! -r "$_keyfile" ]; then return 1; fi
    echo $_keyfile | sed -r -e 's,/+,/,g'
