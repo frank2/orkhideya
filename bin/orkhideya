@@ -162,7 +162,7 @@ if [ -f "$HOME/.orkhideya" -a -r "$HOME/.orkhideya" ]; then
    source "$HOME/.orkhideya"
 fi
 
-for _path in include etc var tmp; do
+for _path in include etc tmp; do
    _pathroot="$(ork_pathroot $_path)"
 
    if [ ! -d "$_pathroot" ]; then
