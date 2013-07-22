@@ -3,7 +3,7 @@
 source orkhideya
 ork_include stdlib
 
-function net_exists
+function net_if_exists
 {
    local _interface="$1"
    test -n "$(ifconfig -a | grep "^${_interface}:")"
@@ -21,11 +21,11 @@ function net_ipv4mask
    return 0
 }
 
-function net_isup
+function net_if_isup
 {
    local _interface="$1"
 
-   if ! net_exists "$_interface"; then return 1; fi
+   if ! net_if_exists "$_interface"; then return 1; fi
 
    ifconfig -s | tail -n+2 | grep -q "^${_interface}"
    return $?
@@ -93,7 +93,7 @@ function net_inttoipv4
    return 0
 }
 
-function net_downup
+function net_if_downup
 {
    local _interface="$1"
    local _downup="$2"
@@ -106,31 +106,31 @@ function net_downup
    return $?
 }
 
-function net_down
+function net_if_down
 {
    local _interface="$1"
-   net_downup "$_interface" down
+   net_if_downup "$_interface" down
    return $?
 }
 
-function net_up
+function net_if_up
 {
    local _interface="$1"
-   net_downup "$_interface" up
+   net_if_downup "$_interface" up
    return $?
 }
 
-function net_haslink
+function net_if_haslink
 {
    local _interface="$1"
    local _carrier="/sys/class/net/$_interface/carrier"
 
-   if ! ( net_exists "$_interface" ); then return 1; fi
+   if ! ( net_if_exists "$_interface" ); then return 1; fi
    test -r "$_carrier" -a "$(cat "$_carrier" 2>/dev/null)" == "1"
    return $?
 }
 
-function net_address_canacquire
+function net_if_address_canacquire
 {
    local _family="$1"
 
@@ -144,53 +144,159 @@ function net_address_canacquire
    esac
 }
 
-function net_address_get
+function net_if_address_get
 {
    local _interface="$1"
    local _family="$2"
 
-   if ! net_address_canacquire "$_family"; then return 1; fi
-   if ! net_exists "$_interface"; then return 2; fi
+   if ! net_if_address_canacquire "$_family"; then return 1; fi
+   if ! net_if_exists "$_interface"; then return 2; fi
 
    ifconfig "$_interface" | grep -o -P "$_family\s+.*" | awk '{ print $2 }'
    if [ "$?" != "0" ]; then return 3; fi
    return 0
 }
 
-function net_address_set
+function net_if_address_set
 {
    local _interface="$1"
    local _family="$2"
    local _address="$3"
 
-   if ! net_address_canacquire "$_family"; then return 1; fi
-   if ! net_exists "$_interface"; then return 2; fi
+   if ! net_if_address_canacquire "$_family"; then return 1; fi
+   if ! net_if_exists "$_interface"; then return 2; fi
 
    ifconfig "$_interface" "$_family" "$_address"
    if [ "$?" != "0" ]; then return 3; fi
    return 0
 }
 
-function net_link_wait
+function net_if_link_wait
 {
    local _device="$1"
 
-   if ! net_exists "$_device"; then return 1; fi
-   if ! net_isup "$_device"; then return 2; fi
+   if ! net_if_exists "$_device"; then return 1; fi
+   if ! net_if_isup "$_device"; then return 2; fi
 
    local _timeout="0"
 
-   while [ "$_timeout" -lt "$ORK_NET_LINKTIMEOUT" ]; do
-      if net_haslink "$_device"; then break; fi
+   while [ "$_timeout" -lt "$ORK_NET_LINK_TIMEOUT" ]; do
+      if net_if_haslink "$_device"; then break; fi
       sleep 1
       _timeout="$(($_timeout+1))"
    done
 
-   if [ "$_timeout" == "$ORK_NET_LINKTIMEOUT" ]; then
+   if [ "$_timeout" == "$ORK_NET_LINK_TIMEOUT" ]; then
       return 3
    fi
 
    return 0
 }
 
-ORK_NET_LINKTIMEOUT="30"
+function net_dev_root
+{
+   echo "$(ork_pathroot etc)/$ORK_NET_DEVICE_PATH"
+   return 0
+}
+
+function net_dev_skeleton
+{
+   echo "$(ork_pathroot etc)/$ORK_NET_DEVICE_SKELETON"
+   return 0
+}
+
+function net_dev_path
+{
+   local _device="$1"
+   echo "$(net_dev_root)/$(stdlib_pathify "$_device")"
+   return 0
+}
+
+function net_dev_skeleton_path
+{
+   local _device="$1"
+   echo "$(net_dev_skeleton)/$(stdlib_pathify "$_device")"
+   return 0
+}
+
+function net_dev_exists
+{
+   local _device="$1"
+
+   test -d "$(net_dev_path "$_device")"
+   return $?
+}
+
+function net_dev_create
+{
+   local _device="$1"
+   if net_dev_exists "$_device"; then return 1; fi
+
+   local _dev_path="$(net_dev_path "$_device")"
+   if ! mkdir -p "$_dev_path"; then return 2; fi
+
+   if [ -d "$(net_dev_skeleton_path "$_device")" ]; then
+      ! cp "$(net_dev_skeleton_path "$_device")/*" "$_dev_path/"; then return 3; fi
+   else
+      local _initial_files="{ifup,ifdown,config}"
+      if ! touch "$_dev_path/$_initial_files"; then return 4; fi
+      if ! chmod +x "$_dev_path/$_initial_files"; then return 5; fi
+   fi
+
+   return 0
+}
+
+function net_dev_destroy
+{
+   local _device="$1"
+   if ! net_dev_exists "$_device"; then return 1; fi
+
+   local _dev_path="$(net_dev_path "$_device")"
+   if ! rm -rf "$_dev_path"; then return 2; fi
+   return 0
+}
+
+function net_dev_downup
+{
+   local _device="$1"
+   local _downup="$2"
+   if [ "$_downup" != "up" -a "$_downup" != "down" ]; then return 1; fi
+
+   local _downup_args="${@:3}"
+   if ! net_dev_exists "$_device"; then return 2; fi
+
+   local _dev_path="$(net_dev_path "$_device")"
+   if [ -e "$_dev_path/config" ]; then
+      source "$_dev_path/config"
+      if [ "$?" != "0" ]; then return 3; fi
+   fi
+
+   if [ ! -x "$_dev_path/ifup" ]; then return 4; fi
+
+   "$_dev_path/if$_downup" "$_downup_args"
+   if [ "$?" != "0" ]; then return 5; fi
+
+   return 0
+}
+
+function net_dev_down
+{
+   local _device="$1"
+   local _downargs="${@:2}"
+
+   net_dev_downup "$_device" down "$_downargs"
+   return $?
+}
+
+function net_dev_up
+{
+   local _device="$1"
+   local _upargs="${@:2}"
+
+   net_dev_downup "$_device" up "$_upargs"
+   return $?
+}
+
+ORK_NET_LINK_TIMEOUT="30"
+ORK_NET_DEVICE_PATH="dev"
+ORK_NET_DEVICE_SKELETON="skeleton"

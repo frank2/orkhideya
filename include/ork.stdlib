@@ -82,3 +82,14 @@ function stdlib_cdup
    echo $_path | sed -e "s,${_last}\$,,"
    return 0
 }
+
+function stdlib_forcepath
+{
+   local _file="$@"
+   local _rootpath="$(stdlib_cdup $_file)"
+
+   if [ -z "$_rootpath" ]; then return 1; fi
+
+   if ! mkdir -p "$_rootpath"; then return 2; fi
+   return 0
+}
