@@ -1,0 +1,101 @@
+#!/bin/bash
+
+source orkhideya
+ork_include stdlib
+ork_include ssh
+
+function migrate_root
+{
+   ork_pathcat "$(ork_pathroot etc)" "$ORK_MIGRATE_PATH"
+   return 0
+}
+
+function migrate_tarball_root
+{
+   ork_pathcat "$(ork_pathroot tmp)" "$ORK_MIGRATE_PATH"
+   return 0
+}
+
+function migrate_tarball_file
+{
+   local _label="$1"
+   local _migration_file="$(stdlib_forcepath "$(ork_pathcat "$(migrate_tarball_root)" "orkhideya")")"
+   if [ "$?" != "0" ]; then return 1; fi
+
+   if [ -n "$_label" ]; then
+      _migration_file="${_migration_file}-$_label"
+   fi
+
+   echo "${_migration_file}.tar"
+   return 0
+}
+
+function migrate_tarball_started
+{
+   local _label="$1"
+   local _migration_file="$(migrate_tarball_file "$_label")"
+   test -e "$_migration_file"
+   return $?
+}
+
+function migrate_tarball_begin
+{
+   local _label="$1"
+   if migrate_tarball_started "$_label"; then return 1; fi
+
+   local _migration_file="$(migrate_tarball_file "$_label")"
+   tar cfT "$_migration_file" /dev/null
+   if [ "$?" != "0" ]; then return 2; fi
+
+   echo "$_migration_file"
+   return 0
+}
+
+function migrate_tarball_add_file
+{
+   local _label="$1"
+   if ! migrate_tarball_started "$_label"; then return 1; fi
+
+   local _file="$2"
+   if [ ! -e "$_file" ]; then return 2; fi
+
+   tar Af "$(migrate_tarball_file "$_label")" "$_file"
+   if [ "$?" != "0" ]; then return 1; fi
+   return 0
+}
+
+function migrate_tarball_add_path
+{
+   local _label="$1"
+   if ! migrate_tarball_started "$_label"; then return 1; fi
+
+   local _path="$2"
+   if [ ! -d "$_path" ]; then return 2; fi
+
+   tar Af "$(migrate_tarball_file "$_label")" --recursion "$_path"
+   if [ "$?" != "0" ]; then return 1; fi
+   return 0
+}
+
+function migrate_tarball_end
+{
+   local _label="$1"
+   if ! migrate_tarball_started "$_label"; then return 1; fi
+
+   local _migration_file="$(migrate_tarball_file "$_label")"
+   gzip "$_migration_file"
+   if [ "$?" != "0" ]; then return 2; fi
+
+   echo "${_migration_file}.gz"
+   return 0
+}
+
+function migrate_build_tarball
+{
+   local _migration_config
+}
+
+ORK_MIGRATE_PATH="migrate"
+ORK_MIGRATE_CONFIG_FILE="config"
+ORK_MIGRATE_PACKAGE_FILE="package"
+ORK_MIGRATE_INSTALL_FILE="install"
