@@ -5,27 +5,27 @@ ork_include stdout
 
 function ssh_site_root
 {
-   ork_pathcat "$(ork_pathroot etc)" "$ORK_SSH_ORKCONFIG" "$ORK_SSH_SITEPATH"
+   ork_pathcat "$(ork_configpath ssh)" "$ORK_SSH_SITEPATH"
    return 0
 }
 
 function ssh_site_path
 {
    _site="$1"
-   echo "$(ssh_site_root)/$(stdlib_pathify "$_site")"
+   ork_pathcat "$(ssh_site_root)" "$(stdlib_pathify "$_site")"
    return 0
 }
 
 function ssh_key_root
 {
-   ork_pathcat "$(ork_pathroot etc)" "$ORK_SSH_ORKCONFIG" "$ORK_SSH_KEYPATH"
+   ork_pathcat "$(ork_configpath ssh)" "$ORK_SSH_KEYPATH"
    return 0
 }
 
 function ssh_key_path
 {
    _site="$1"
-   echo "$(ssh_key_root)/$(stdlib_pathify "$_site")"
+   ork_pathcat "$(ssh_key_root)" "$(stdlib_pathify "$_site")"
    return 0
 }
 
@@ -152,7 +152,6 @@ function ssh_site_keys
    return 0
 }
 
-ORK_SSH_ORKCONFIG="ssh"
 ORK_SSH_SSHCONFIG="$HOME/.ssh"
 ORK_SSH_KEYFILE="id_rsa"
 ORK_SSH_SITEPATH="sites"

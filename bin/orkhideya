@@ -67,7 +67,7 @@ function ork_configpath
    _library="$1"
    ork_verify "$_library"
 
-   echo "$(ork_pathroot etc)/$_library"
+   ork_pathcat "$(ork_pathroot etc)" "$_library"
    return 0
 }
 
@@ -76,7 +76,7 @@ function ork_reconfigure
    _library="$1"
    ork_verify "$_library"
 
-   _config="$(ork_configpath $_library)/config"
+   _config="$(ork_pathcat "$(ork_configpath $_library)" "config")"
 
    if [ -r "$_config" ]; then
       source "$_config"

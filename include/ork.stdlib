@@ -15,6 +15,21 @@ function stdlib_trap
    return 0
 }
 
+function stdlib_clean_trap
+{
+   local _function="$1"
+   local _commands="$@"
+   local _status="$(stdlib_trap "$_commands")"
+   _status="$?"
+
+   if [ "$_status" == "1" ]; then
+      eval "$_function"
+      exit 1
+   fi
+
+   return 0
+}
+
 function stdlib_isroot
 {
    test "$(id -u)" == 0
