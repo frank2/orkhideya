@@ -5,7 +5,7 @@ ork_include stdout
 function stdlib_trap
 {
    "$@"
-   _status="$?"
+   local _status="$?"
 
    if [ "$_status" != "0" ]; then
       stdout_error "Execution failed (status: $_status)"
@@ -38,43 +38,48 @@ function stdlib_isroot
 
 function stdlib_tolower
 {
-   _message="$@"
+   local _message="$@"
    echo $_message | tr '[:upper:]' '[:lower:]'
    return $?
 }
 
 function stdlib_toupper
 {
-   _message="$@"
+   local _message="$@"
    echo $_message | tr '[:lower:]' '[:upper:]'
    return $?
 }
 
 function stdlib_pathify
 {
-   _configuration="$@"
+   local _configuration="$@"
    echo "$_configuration" | sed -e 's,\.,/,g'
    return $?
 }
 
 function stdlib_configify
 {
-   _path="$@"
+   local _path="$@"
    echo "$_path" | sed -e 's,/,.,g'
    return $?
 }
 
 function stdlib_edit
 {
-   _output_file="$1"
+   local _output_file="$1"
+
+   if [ -z "$EDITOR" ]; then
+      local EDITOR="$(which vim)"
+   fi
+
    $EDITOR "$_output_file"
    return $?
 }
 
 function stdlib_strcount
 {
-   _needle="$1"
-   _haystack="${@:2}"
+   local _needle="$1"
+   local _haystack="${@:2}"
 
    echo $_haystack | grep -o "$_needle" | wc -l
    return $?
@@ -82,13 +87,24 @@ function stdlib_strcount
 
 function stdlib_cdup
 {
-   _path="$@"
+   local _path="$@"
    if [ -z "$_path" ]; then return 1; fi
 
-   _last="$(echo $_path | awk -F '/' '{ print $NF }')"
+   local _last="$(echo $_path | awk -F '/' '{ print $NF }')"
 
-   if echo $_path | grep -q "/$_last$"; then _last="/$_last"; fi
+   if echo $_path | grep -q "/$_last$"; then local _last="/$_last"; fi
 
    echo $_path | sed -e "s,${_last}\$,,"
+   return 0
+}
+
+function stdlib_forcepath
+{
+   local _file="$@"
+   local _rootpath="$(stdlib_cdup $_file)"
+
+   if [ -z "$_rootpath" ]; then return 1; fi
+
+   if ! mkdir -p "$_rootpath"; then return 2; fi
    return 0
 }

@@ -3,9 +3,15 @@
 ork_include stdlib
 ork_include stdout
 
+function ssh_root
+{
+   ork_configpath ssh
+   return 0
+}
+
 function ssh_site_root
 {
-   ork_pathcat "$(ork_configpath ssh)" "$ORK_SSH_SITEPATH"
+   ork_pathcat "$(ssh_root)" "$ORK_SSH_SITEPATH"
    return 0
 }
 
@@ -36,7 +42,7 @@ function ssh_site_exists
    return $?
 }
 
-function ssh_site_config
+function ssh_site_config_file
 {
    _site="$1"
    if ! ssh_site_exists "$_site"; then return 1; fi
@@ -47,20 +53,140 @@ function ssh_site_config
 
 function ssh_key_file
 {
+   # an ssh site can exist without a keyfile, but not the other way around.
    _site="$1"
    if ! ssh_site_exists "$_site"; then return 1; fi
+   
+   echo "$(ssh_key_root)/$(stdlib_pathify "$_site")/$ORK_SSH_KEYFILE"
+   return 0
+}
 
-   echo "$(ssh_key_path $_site)/$ORK_SSH_KEYFILE"
+function ssh_site_config_build
+{
+   local _site="$1"
+
+   if [ -z "$_site" -o "$_site" == "-" ]; then
+      stdout_warning "Site argument is blank. This will generate an SSH config for all configured sites."
+      _site=""
+   elif ! ssh_site_exists "$_site"; then 
+      return 1
+   fi
+
+   local _site_root="$(ssh_site_root)"
+   local _key_root="$(ssh_key_root)"
+   local _search_path="$_site_root/$(stdlib_pathify $_site)"
+   local _config_paths=$(for _config_path in $(find $_search_path -type d); do echo $(stdlib_strcount '/' "$_config_path") "$_config_path"; done | sort -g -r | awk '{ print $2 }' | sed -e "s,^$_site_root,,")
+
+   OLDIFS=$IFS
+   IFS="
+"
+
+   for _config_path in $_config_paths; do
+      local _inferred_host="$(stdlib_configify "${_config_path:1}")"
+      local _site_config="$(ssh_site_config_file "$_inferred_host")"
+      local _site_key="$(ssh_site_key "$_inferred_host")"
+      local _site_host=""
+      
+      if [ -e "$_site_key" ]; then
+         _site_host="$_inferred_host"
+      fi
+
+      if [ -n "$(test -e "$_site_config" && cat "$_site_config")" ]; then
+         local _config_host="$(grep -o -P '^Host\s+(.*)$' "$_site_config" | awk '{ print $2 }')"
+
+         if [ -n "$_config_host" ]; then
+            _site_host="$_config_host"
+         else
+            _site_host="$(stdlib_configify "${_config_path:1}")"
+         fi
+      fi
+
+      if [ -n "$_site_host" -a -z "$_config_host" ]; then
+         local _occurrences="$(stdlib_strcount "$_config_path" "$_config_paths")"
+
+         if [ -e "$_site_key" -o -e "$_site_config" ]; then
+            if [ "$_occurrences" -gt 1 ]; then
+               if [ -n "$(test -e "$_site_config" && grep -o -P '^\s*HostName\s+' "$_site_config")" ]; then
+                  echo "Host ${_site_host}.* $_site_host"
+               else
+                  echo "Host ${_site_host}.*"
+               fi
+            else
+               echo "Host $_site_host"
+            fi
+         fi
+      elif [ -z "$_site_host" -a -z "$_config_host" -a \( -n "$(test -e "$_site_config" && cat "$_site_config")" -o -e "$_site_key" \) ]; then
+         echo "Host *"
+      fi
+
+      if [ -n "$(test -e "$_site_config" && cat "$_site_config")" ]; then
+         for _line in $(cat "$_site_config"); do
+            if ! echo $_line | grep -q -P "^Host\s+"; then
+               printf "\t%s\n" "$_line"
+            else
+               printf "%s\n" "$_line"
+            fi
+         done
+
+         printf "\n"
+      fi
+
+      if [ -e "$_site_key" ]; then
+         printf "\tIdentityFile %s\n\n" "$_site_key"
+      fi
+   done
+
+   IFS=$OLDIFS
+   return 0
+}
+
+function ssh_site_config_edit
+{
+   local _site="$1"
+   if ! ssh_site_exists "$_site"; then return 1; fi
+
+   local _config_file="$(ssh_site_config_file "$_site")"
+
+   stdlib_edit "$_config_file"
+   return $?
+}
+
+function ssh_site_config_save
+{
+   local _site="$1"
+   local _filename="$2"
+   if [ "$_site" != "-" -a -n "$_site" ] && ! ssh_site_exists "$_site"; then return 1; fi
+
+   if [ -z "$_filename" ]; then
+      stdout_warning "No filename given. This will overwrite your current SSH config."
+      local _continue="$(stdout_prompt_yesno "Continue?")"
+
+      if [ "$_continue" == "n" ]; then return 2; fi
+
+      _filename="$ORK_SSH_SSHCONFIG/config"
+   fi
+
+   _tmpfile="$(ork_pathroot tmp)/ssh_config"
+
+   ssh_site_config_build "$_site" > "$_tmpfile"
+   if [ "$?" != "0" ]; then 
+      if [ -e "$_tmpfile" ]; then shred -u "$_tmpfile"; fi
+      return 3
+   fi
+
+   if ! mv "$_tmpfile" "$_filename"; then return 4; fi
+
+   chmod 600 "$_filename"
    return 0
 }
 
 function ssh_site_create
 {
-   _site="$1"
+   local _site="$1"
    if ssh_site_exists "$_site"; then return 1; fi
    if ! mkdir -p "$(ssh_site_path $_site)"; then return 2; fi
 
-   _config_file="$(ssh_site_config $_site)"
+   _config_file="$(ssh_site_config_file $_site)"
    if ! touch "$_config_file"; then return 3; fi
 
    echo "# ORKHiDEYA config for site "$_site"" > "$_config_file"
@@ -105,39 +231,117 @@ function ssh_key_gen
    return 0
 }
 
+function ssh_key_select
+{
+   local _site="$1"
+   local _keys="$(ssh_site_keys "$_site")"
+
+   if [ "$?" != "0" ]; then return 1; fi
+
+   local _key=""
+   local _keycount="$(stdlib_strcount ':' "$_keys")"
+
+   if [ "$_keycount" -gt "0" ]; then
+      local _selections="$(seq 1 $(($_keycount+1)))"
+      local _valid_selection=""
+
+      while [ -z "$_valid_selection" ]; do
+         stdout_normal "There is more than one key associated with $(stdout_color_wrap main-focused "$_site")."
+
+         for _selection in $_selections; do
+            stdout_normal "$(printf "%2d) %s" $_selection "$(stdlib_configify "$(echo $_keys | awk -F ':' "{ print \$$_selection }" | sed -e "s,^$(ssh_key_root)/,," -e "s,${ORK_SSH_KEYFILE}\$,$(color_render "$(stdout_color_wrap main-focused "${ORK_SSH_KEYFILE}"),")")")")"
+         done
+
+         stdout_normal "$(stdout_color_wrap main-unfocused ---)"
+         _valid_selection="$(stdout_prompt "Please select a key.")"
+
+         if ! echo $_valid_selection | grep -q -P "^\d+$" || ! echo $_selections | grep -q -P "(\s*$_valid_selection\s+|\s+$_valid_selection\s*)"; then
+            stdout_error "Invalid selection: $(stdout_color_wrap main-focused "$_valid_selection")"
+            _valid_selection=""
+         fi
+      done
+
+      _key="$(echo $_keys | awk -F ':' "{ print \$${_valid_selection} }")"
+   else
+      _key="$_keys"
+   fi
+
+   if [ ! -e "${_key}.pub" ]; then
+      stdout_error "No public key found for private keyfile."
+      return 2
+   fi
+
+   echo "$_key"
+   return 0
+}
+
 function ssh_key_exchange
 {
-   _site="$1"
-   _authfile="$2"
-
-   if [ -z "$_authfile" ]; then
+   local _site="$1"
+   local _key="$2"
+   
+   if [ -z "$_key" ]; then
+      _key="$(ssh_key_select "$_site").pub"
+   else
+      _key="$(ssh_key_select "$_key").pub"
    fi
+
+   local _remote_ssh_config="$3"
+   if [ -z "$_remote_ssh_config" ]; then _remote_ssh_config="~/.ssh"; fi
+
+   if [ "$?" != "0" ]; then return 1; fi
+
+   stdout_normal "Using public keyfile $(stdout_color_wrap main-focused "${_key}")."
+   stdout_warning "Attempting key exchange with $(stdout_color_wrap main-focused "$_site")."
+
+   cat $_key | ssh "$_site" "umask 077; test -d "$_remote_ssh_config" || mkdir "$_remote_ssh_config" ; cat - >> "$_remote_ssh_config/authorized_keys" ; sort -u "$_remote_ssh_config/authorized_keys" -o "$_remote_ssh_config/authorized_keys""
+
+   if [ "$?" != "0" ]; then
+      stdout_error "Key exchange failed."
+      return 3
+   fi
+
+   stdout_normal "Key exchanged successfully."
+   return 0
+}
+
+function ssh_site_key
+{
+   local _site="$1"
+
+   if [ "$_site" == "-" ]; then
+      stdout_warning "Site argument is blank. This will only return the root key."
+      _site=""
+   fi
+
+   local _keyfile="$(ssh_key_file $_site)"
+
+   if [ ! -r "$_keyfile" ]; then return 1; fi
+   echo $_keyfile | sed -r -e 's,/+,/,g'
+   return 0
 }
 
 function ssh_site_keys
 {
-   _site="$1"
+   local _site="$1"
 
    if [ "$_site" == "-" ]; then
-      stdout_warning "Site argument is blank. This will only return the default key."
+      stdout_warning "Site argument is blank. This will only return the root key."
       _site=""
    elif ! ssh_site_exists "$_site"; then 
       return 1
    fi
 
-   _keys=""
-   _root="$(ssh_key_root)"
+   local _keys=""
+   local _root="$(ssh_key_root)"
+   local _keypath="$(stdlib_pathify "$_site")"
 
-   if [ -z "$_site" ]; then
-      _keypath='/'
-   else
-      _keypath="$(stdlib_pathify "$_site")"
-   fi
+   while : ; do
+      if [ -n "$_root_key" ]; then break; fi
+      if [ -z "$_keypath" ]; then local _root_key="1"; fi
+      local _keyfile="$(ssh_site_key "$(stdlib_configify "$_keypath")" 2>/dev/null)"
 
-   while [ -n "$_keypath" ]; do
-      _keyfile="$_root/$_keypath/$ORK_SSH_KEYFILE"
-
-      if [ -r "$_keyfile" ]; then
+      if [ -n "$_keyfile" ]; then
          if [ -z "$_keys" ]; then
             _keys="$_keyfile"
          else

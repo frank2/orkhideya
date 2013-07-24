@@ -3,20 +3,37 @@
 source orkhideya
 ork_include stdlib
 
+function net_if_exists
+{
+   local _interface="$1"
+   test -n "$(ifconfig -a | grep "^${_interface}:")"
+   return $?
+}
+
 function net_ipv4mask
 {
-   _size="$1"
+   local _size="$1"
    if [ "$_size" -lt 0 -o "$_size" -gt 32 ]; then return 1; fi
 
-   _inversion="$((32 - $_size))"
+   local _inversion="$((32 - $_size))"
 
    echo "$(( (2 ** $_size - 1) << $_inversion ))"
    return 0
 }
 
+function net_if_isup
+{
+   local _interface="$1"
+
+   if ! net_if_exists "$_interface"; then return 1; fi
+
+   ifconfig -s | tail -n+2 | grep -q "^${_interface}"
+   return $?
+}
+
 function net_isipv4
 {
-   _address="$1"
+   local _address="$1"
 
    echo $_address | grep -q -P '((\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
    return $?
@@ -24,10 +41,10 @@ function net_isipv4
 
 function net_iscidr
 {
-   _address="$1"
+   local _address="$1"
    if ! ( echo "$_address" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_address")" -gt 1 ]; then return 1; fi
 
-   _network="$(echo "$_address" | awk -F '/' '{ print $2 }')"
+   local _network="$(echo "$_address" | awk -F '/' '{ print $2 }')"
    if ! ( echo $_network | grep -q '^[0-9]+$' ); then return 2; fi
 
    net_isipv4 "$_address" && [ "$_network" -ge "0" -a "$_network" -le "32" ];
@@ -36,13 +53,13 @@ function net_iscidr
 
 function net_ipv4toint
 {
-   _address="$1"
-   _number="0"
+   local _address="$1"
+   local _number="0"
 
    if ! net_isipv4 "$_address"; then return 1; fi
 
    for _chunk in $(seq 1 4); do
-      _octet="$(echo "$_address" | awk -F '.' "{ print \$$_chunk }")"
+      local _octet="$(echo "$_address" | awk -F '.' "{ print \$$_chunk }")"
       _number="$(($_number | ($_octet << 32 - (8 * $_chunk))))"
    done
 
@@ -52,7 +69,7 @@ function net_ipv4toint
 
 function net_inttoipv4
 {
-   _number="$(stdlib_tolower "$1")"
+   local _number="$(stdlib_tolower "$1")"
 
    if echo $_number | grep -q '^[0-9a-f]$'; then
       _number="$(($_number))"
@@ -62,7 +79,7 @@ function net_inttoipv4
 
    if [ "$_number" -lt "0" -o "$_number" -gt "$(net_ipv4mask 32)" ]; then return 2; fi
 
-   _address=""
+   local _address=""
 
    for _chunk in $(seq 1 4); do
       if [ -n "$_address" ]; then
@@ -78,29 +95,29 @@ function net_inttoipv4
 
 function net_if_exists
 {
-   _interface="$1"
+   local _interface="$1"
    test -n "$(ifconfig -a | grep "^${_interface}:")"
    return $?
 }
 
 function net_if_isup
 {
-   _interface="$1"
+   local _interface="$1"
    ifconfig -s | tail -n+2 | grep -q "^${_interface}"
    return $?
 }
 
 function net_if_isdown
 {
-   _interface="$1"
+   local _interface="$1"
    ! net_if_isup "$_interface"
    return $?
 }
 
 function net_if_downup
 {
-   _interface="$1"
-   _downup="$2"
+   local _interface="$1"
+   local _downup="$2"
 
    if [ "$_downup" != "down" -a "$_downup" != "up" ]; then
       return 1
@@ -112,22 +129,22 @@ function net_if_downup
 
 function net_if_down
 {
-   _interface="$1"
+   local _interface="$1"
    net_if_downup "$_interface" down
    return $?
 }
 
 function net_if_up
 {
-   _interface="$1"
+   local _interface="$1"
    net_if_downup "$_interface" up
    return $?
 }
 
 function net_if_haslink
 {
-   _interface="$1"
-   _carrier="/sys/class/net/$_interface/carrier"
+   local _interface="$1"
+   local _carrier="/sys/class/net/$_interface/carrier"
 
    if ! ( net_if_exists "$_interface" ); then return 1; fi
    test -r "$_carrier" -a "$(cat "$_carrier" 2>/dev/null)" == "1"
@@ -136,7 +153,7 @@ function net_if_haslink
 
 function net_if_address_canacquire
 {
-   _family="$1"
+   local _family="$1"
 
    case "$_family" in
       unix|inet|inet6|ax25|netrom|rose|ipx|ddp|ec|ash|x25|netmask|broadcast)
@@ -150,8 +167,8 @@ function net_if_address_canacquire
 
 function net_if_address_get
 {
-   _interface="$1"
-   _family="$2"
+   local _interface="$1"
+   local _family="$2"
 
    if ! net_if_address_canacquire "$_family"; then return 1; fi
    if ! net_if_exists "$_interface"; then return 2; fi
@@ -163,9 +180,9 @@ function net_if_address_get
 
 function net_if_address_set
 {
-   _interface="$1"
-   _family="$2"
-   _address="$3"
+   local _interface="$1"
+   local _family="$2"
+   local _address="$3"
 
    if ! net_if_address_canacquire "$_family"; then return 1; fi
    if ! net_if_exists "$_interface"; then return 2; fi

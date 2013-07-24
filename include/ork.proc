@@ -3,7 +3,70 @@
 source orkhideya
 ork_include stdlib
 
-PROC_PID="$ORK_VAR/pid"
+function proc_pid_root
+{
+   echo "$(ork_pathroot var)/$ORK_PROC_PIDPATH"
+   return 0
+}
+
+function proc_pidfile
+{
+   local _label="$1"
+   echo "$(proc_pid_root)/$_label"
+   return 0
+}
+
+function proc_exists
+{
+   local _label="$1"
+
+   test -e "$(proc_pidfile $_label)"
+   return $?
+}
+
+function proc_pid
+{
+   local _label="$1"
+
+   if ! proc_exists "$_label"; then return 1; fi
+   cat "$(proc_pidfile "$_label")"
+
+   if [ "$?" != "0" ]; then return 2; fi
+   return 0
+}
+
+function proc_running
+{
+   local _label="$1"
+
+   if ! proc_exists "$_label"; then return 1; fi
+   test -n "$(ps -p "$(proc_pid "$_label")" | tail -n+2)"
+   return $?
+}
+
+function proc_new
+{
+   local _pid="$1"
+   local _label="$2"
+   local _command="${@:3}"
+
+   if [ -z "$_label" ]; then return 1
+   elif [ "$_label" == '-' ]; then
+   fi
+
+   local _filename="$(stdlib_forcepath "$(proc_pid_root)/$_label")"
+
+   if [ -z "$_filename" ]; then return 2
+   elif [ -e "$_filename" ]; then return 3 # pid by this label exists already
+   fi
+
+   $_command &
+   _resulting_pid="$!"
+   if [ -z "$_resulting_pid" ]; then return 4; fi
+
+   echo "$_pid" > "$_filename"
+   return 0
+}
 
 function proc_silent
 {
@@ -11,36 +74,19 @@ function proc_silent
    return $?
 }
 
-function proc_background
-{
-   proc_silent "$@" &
-   echo "$!"
-   return 0
-}
-
-function proc_daemonize
-{
-   _category="$1"
-   _pid="$(proc_background "${@:2}")"
-
-   if [ -z "$_category" ]; then
-      proc_kill $_pid
-      return 1
-   fi
-
-   mkdir -p "$PROC_PID/$_category"
-   echo "${@:2}" > "$PROC_PID/$_category/$_pid"
-
-   echo "$_pid"
-   return 0
-}
-
 function proc_kill
 {
-   _pid="$1"
+   local _label="$1"
+   if ! proc_exists "$_label"; then return 1; fi
 
-   proc_silent find "$PROC_PID" -name "$_pid" -exec rm {} \;
+   if proc_running "$_label"; then
+      local _pid="$(proc_pid "$_label")"
+      proc_silent kill -9 "$_pid"
+   fi
 
-   proc_silent kill -9 $_pid
-   return $?
+   _pidfile="$(proc_pidfile "$_label")"
+   proc_silent rm -rf "$_pidfile"
+   return 0
 }
+
+ORK_PROC_PID_PATH="pid"
