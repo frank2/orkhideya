@@ -216,3 +216,6 @@ ORK_STDOUT_INDICATOR_ERROR="$(stdout_color attention '!')"
 
 # prompt
 ORK_STDOUT_PROMPT="$(stdout_color_wrap attention '>>')"
+
+# make this reconfigurable
+ork_reconfigure stdout
