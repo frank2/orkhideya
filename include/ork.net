@@ -236,7 +236,7 @@ function net_dev_create
    if ! mkdir -p "$_dev_path"; then return 2; fi
 
    if [ -d "$(net_dev_skeleton_path "$_device")" ]; then
-      ! cp "$(net_dev_skeleton_path "$_device")/*" "$_dev_path/"; then return 3; fi
+      if ! cp "$(net_dev_skeleton_path "$_device")/*" "$_dev_path/"; then return 3; fi
    else
       local _initial_files="{ifup,ifdown,config}"
       if ! touch "$_dev_path/$_initial_files"; then return 4; fi

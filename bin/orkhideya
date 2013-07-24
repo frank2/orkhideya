@@ -138,7 +138,6 @@ function ork_include
       exit 1
    fi
 
-   ork_reconfigure $_library
    return 0
 }
 
