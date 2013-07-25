@@ -64,6 +64,13 @@ function stdlib_configify
    return $?
 }
 
+function stdlib_fileify
+{
+   local _file="$@"
+   echo "$_file" | sed -e 's/\./-/g'
+   return $?
+}
+
 function stdlib_edit
 {
    local _output_file="$1"
@@ -107,4 +114,22 @@ function stdlib_forcepath
 
    if ! mkdir -p "$_rootpath"; then return 2; fi
    return 0
+}
+
+function stdlib_filesearch
+{
+   local _root="$1"
+   local _path="$2"
+   local _file="$3"
+
+   local _found_file="$_root/$_path/$_file"
+
+   while [ ! -e "$_found_file" ]; do
+      if [ -z "$_path" ]; then break; fi
+      _path=$(stdlib_cdup "$_path")
+      _found_file="$_root/$_path/$_file"
+   done
+
+   if [ -e "$_found_file" ]; then echo "$_found_file"; return 0; fi
+   return 1
 }

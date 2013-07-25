@@ -6,7 +6,7 @@ ork_include ssh
 
 function migrate_root
 {
-   ork_pathcat "$(ork_pathroot etc)" "$ORK_MIGRATE_PATH"
+   ork_configpath "migrate"
    return 0
 }
 
@@ -19,14 +19,9 @@ function migrate_tarball_root
 function migrate_tarball_file
 {
    local _label="$1"
-   local _migration_file="$(stdlib_forcepath "$(ork_pathcat "$(migrate_tarball_root)" "orkhideya")")"
-   if [ "$?" != "0" ]; then return 1; fi
+   if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
 
-   if [ -n "$_label" ]; then
-      _migration_file="${_migration_file}-$_label"
-   fi
-
-   echo "${_migration_file}.tar"
+   echo "$(migrate_tarball_root)/$_label.tar"
    return 0
 }
 
@@ -41,11 +36,15 @@ function migrate_tarball_started
 function migrate_tarball_begin
 {
    local _label="$1"
+   if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
+
    if migrate_tarball_started "$_label"; then return 1; fi
 
    local _migration_file="$(migrate_tarball_file "$_label")"
-   tar cfT "$_migration_file" /dev/null
-   if [ "$?" != "0" ]; then return 2; fi
+   if ! stdlib_forcepath "$_migration_file"; then return 2; fi
+
+   tar --create --file "$_migration_file" --files-from "/dev/null"
+   if [ "$?" != "0" ]; then return 3; fi
 
    echo "$_migration_file"
    return 0
@@ -53,33 +52,61 @@ function migrate_tarball_begin
 
 function migrate_tarball_add_file
 {
-   local _label="$1"
+   local _file="$1"
+   if [ ! -e "$_file" ]; then return 1; fi
+
+   local _label="$2"
+   if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
+
    if ! migrate_tarball_started "$_label"; then return 1; fi
 
-   local _file="$2"
-   if [ ! -e "$_file" ]; then return 2; fi
+   local _new_root="$3"
+   if [ -z "$_new_root" ]; then _new_root="$_label"; else _new_root="$_label/$_new_root"; fi
 
-   tar Af "$(migrate_tarball_file "$_label")" "$_file"
+   local _tar_path="$4"
+   if [ -z "$_tar_path" ]; then _tar_path="$(stdlib_cdup "$_file")"; fi
+
+   if [ -n "$_tar_path" ]; then 
+      _tar_root="-C "$_tar_path""
+      _file="$(echo "$_file" | awk -F '/' '{ print $NF }')"
+   fi
+
+   tar $_tar_root --append --file "$(migrate_tarball_file "$_label")" --transform "s|^|$_new_root/|" --dereference "$_file"
    if [ "$?" != "0" ]; then return 1; fi
    return 0
 }
 
 function migrate_tarball_add_path
 {
-   local _label="$1"
-   if ! migrate_tarball_started "$_label"; then return 1; fi
+   local _path="$1"
+   if [ ! -d "$_path" ]; then return 1; fi
 
-   local _path="$2"
-   if [ ! -d "$_path" ]; then return 2; fi
+   local _label="$2"
+   if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
 
-   tar Af "$(migrate_tarball_file "$_label")" --recursion "$_path"
-   if [ "$?" != "0" ]; then return 1; fi
+   local _new_root="$3"
+   if [ -z "$_new_root" ]; then _new_root="$_label"; else _new_root="$_label/$_new_root"; fi
+
+   local _tar_path="$4"
+   if [ -z "$_tar_path" ]; then _tar_path="$(stdlib_cdup "$_path")"; fi
+
+   if [ -d "$_tar_path" ]; then 
+      _tar_root="-C "$_tar_path""
+      _path="$(echo "$_path" | awk -F '/' '{ print $NF }')"
+   fi
+
+   if ! migrate_tarball_started "$_label"; then return 2; fi
+
+   tar $_tar_root --append --file "$(migrate_tarball_file "$_label")" --transform "s|^|$_new_root/|" --dereference --recursion "$_path/"
+   if [ "$?" != "0" ]; then return 3; fi
    return 0
 }
 
 function migrate_tarball_end
 {
    local _label="$1"
+   if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
+
    if ! migrate_tarball_started "$_label"; then return 1; fi
 
    local _migration_file="$(migrate_tarball_file "$_label")"
@@ -90,12 +117,153 @@ function migrate_tarball_end
    return 0
 }
 
-function migrate_build_tarball
+function migrate_tarball_terminate
 {
-   local _migration_config
+   local _label="$1"
+   if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
+
+   if ! migrate_tarball_started "$_label"; then return 1; fi
+
+   local _migration_file="$(migrate_tarball_file "$_label")"
+   shred -u "$_migration_file"
+   if [ "$?" != "0" ]; then return 2; fi
+
+   return 0
+}
+
+function migrate_strategy_root
+{
+   ork_pathcat "$(migrate_root)" "$ORK_MIGRATE_STRATEGIES"
+   return 0
+}
+
+function migrate_vault_root
+{
+   ork_pathcat "$(migrate_root)" "$ORK_MIGRATE_VAULT"
+   return 0
+}
+
+function migrate_strategy_path
+{
+   local _migration_strategy="$1"
+   ork_pathcat "$(migrate_strategy_root)" "$_migration_strategy"
+   return 0
+}
+
+function migrate_strategy_exists
+{
+   local _migration_strategy="$1"
+   test -d "$(migrate_strategy_path "$(stdlib_pathify "$_migration_strategy")")"
+   return $?
+}
+
+function migrate_strategy_config_file
+{
+   local _migration_strategy="$1"
+   stdlib_filesearch "$(migrate_strategy_root)" "$(stdlib_pathify "$_migration_strategy")" "$ORK_MIGRATE_CONFIG_FILE"
+   return 0
+}
+
+function migrate_strategy_package_file
+{
+   local _migration_strategy="$1"
+   stdlib_filesearch "$(migrate_strategy_root)" "$(stdlib_pathify "$_migration_strategy")" "$ORK_MIGRATE_PACKAGE_FILE"
+   return 0
+}
+
+function migrate_strategy_install_file
+{
+   local _migration_strategy="$1"
+   stdlib_filesearch "$(migrate_strategy_root)" "$(stdlib_pathify "$_migration_strategy")" "$ORK_MIGRATE_INSTALL_FILE"
+   return 0
+}
+
+function migrate_strategy_build_tarball
+{
+   local _migration_strategy="$1"
+   if ! migrate_strategy_exists "$_migration_strategy"; then return 1; fi
+
+   local _label="$2"
+   if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
+
+   local _root="$3"
+   if [ -z "$_root" ]; then _root="$_label"; fi
+
+   local _config_file="$(migrate_strategy_config_file "$_migration_strategy")"
+   if [ ! -e "$_config_file" ]; then return 2; fi
+
+   local _package_file="$(migrate_strategy_package_file "$_migration_strategy")"
+   if [ ! -x "$_package_file" ]; then return 3; fi
+
+   local _tarball="$(migrate_tarball_begin "$_label")"
+   if [ "$?" != "0" ]; then return 4; fi
+
+   $_package_file "$_label" "$_root"
+
+   if [ "$?" != "0" ]; then
+      migrate_tarball_terminate "$_label"
+      return 5
+   fi
+
+   local _install_file="$(migrate_strategy_install_file "$_migration_strategy")"
+   if [ ! -x "$_install_file" ]; then
+      migrate_tarball_terminate "$_label"
+      return 6
+   fi
+
+   migrate_tarball_add_file "$_install_file" "$_label" "."
+   if [ "$?" != "0" ]; then 
+      migrate_tarball_terminate "$_label"
+      return 7
+   fi
+
+   migrate_tarball_add_file "$_config_file" "$_label" "."
+   if [ "$?" != "0" ]; then 
+      migrate_tarball_terminate "$_label"
+      return 8
+   fi
+
+   migrate_tarball_end "$_label"
+   if [ "$?" != "0" ]; then
+      migrate_tarball_terminate "$_label"
+      return 9
+   fi
+
+   return 0
+}
+
+function migrate_ssh
+{
+   local _site="$1"
+   if ! ssh_site_exists "$_site"; then return 1; fi
+
+   local _strategy="$2"
+   if ! migrate_strategy_exists; then return 2; fi
+
+   local _label="$3"
+   if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
+
+   local _root="$4"
+   if [ -z "$_root" ]; then _root="$_label"; fi
+
+   local _tarball="$(migrate_strategy_build_tarball "$_strategy" "$_label" "$_root")"
+   if [ "$?" != "0" ]; then return 3; fi
+
+   cat "$_tarball" | ssh "$_site" "tar xzf - && "$_root/install" "$_root" ; _status=\$?; rm -rf "$_root" 2>/dev/null; exit \$_status"
+   local _status="$?"
+   shred -u "$_tarball"
+
+   if [ "$?" != "0" ]; then return 4; fi
+
+   return 0
 }
 
 ORK_MIGRATE_PATH="migrate"
+ORK_MIGRATE_STRATEGIES="strategies"
+ORK_MIGRATE_VAULT="vault"
 ORK_MIGRATE_CONFIG_FILE="config"
 ORK_MIGRATE_PACKAGE_FILE="package"
 ORK_MIGRATE_INSTALL_FILE="install"
+ORK_MIGRATE_DEFAULT_LABEL="orkhideya-migration"
+
+ork_reconfigure migrate
