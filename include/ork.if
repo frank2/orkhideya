@@ -17,23 +17,61 @@ function if_class_root
 
 function if_dev_root
 {
-   ork_pathcat "$(if_root)" "$ORK_IF_CLASS_PATH"
+   ork_pathcat "$(if_root)" "$ORK_IF_DEV_PATH"
+   return 0
+}
+
+function if_class_path
+{
+   local _class="$1"
+   ork_pathcat "$(if_class_root)" "$_class"
+   return 0
+}
+
+function if_dev_path
+{
+   local _dev="$1"
+   ork_pathcat "$(if_dev_root)" "$_dev"
    return 0
 }
 
 function if_class_exists
 {
+   local _class="$1"
+   test -d "$(if_class_path "$_class")"
+   return $?
+}
+
+function if_dev_exists
+{
+   local _dev="$1"
+   test -d "$(if_dev_path "$_dev")"
+   return $?
 }
 
 function if_class_new
 {
-}
+   local _class="$1"
+   ! if_class_exists "$_class" && return 1
 
-function if_if_exists
-{
-   local _interface="$1"
-   test -n "$(ifconfig -a | grep "^${_interface}:")"
-   return $?
+   local _class_path="$(if_class_path "$_class")"
+
+   local _class_create="$_class_path/create"
+   [ ! -x "$_class_create" ] && return 2
+
+   local _new_device="$($_class_create)"
+   if [ "$?" != "0" ]; then return 3; fi
+
+   local _dev_path="$(if_dev_path "$_new_device")"
+   if [ -d "$_dev_path" ]; then return 4; fi
+
+   local _dev_file="$_dev_path/class"
+   stdlib_forcepath "$_dev_file"
+
+   echo "$_class" > "$_dev_file"
+   echo "$_new_device"
+
+   return 0
 }
 
 function if_ipv4mask
@@ -45,16 +83,6 @@ function if_ipv4mask
 
    echo "$(( (2 ** $_size - 1) << $_inversion ))"
    return 0
-}
-
-function if_if_isup
-{
-   local _interface="$1"
-
-   if ! if_if_exists "$_interface"; then return 1; fi
-
-   ifconfig -s | tail -n+2 | grep -q "^${_interface}"
-   return $?
 }
 
 function if_isipv4
@@ -119,28 +147,31 @@ function if_inttoipv4
    return 0
 }
 
-function if_if_exists
+function if_interface_exists
 {
    local _interface="$1"
    test -n "$(ifconfig -a | grep "^${_interface}:")"
    return $?
 }
 
-function if_if_isup
+function if_interface_isup
 {
    local _interface="$1"
+
+   if ! if_interface_exists "$_interface"; then return 1; fi
+
    ifconfig -s | tail -n+2 | grep -q "^${_interface}"
    return $?
 }
 
-function if_if_isdown
+function if_interface_isdown
 {
    local _interface="$1"
-   ! if_if_isup "$_interface"
+   ! if_interface_isup "$_interface"
    return $?
 }
 
-function if_if_downup
+function if_interface_downup
 {
    local _interface="$1"
    local _downup="$2"
@@ -153,31 +184,31 @@ function if_if_downup
    return $?
 }
 
-function if_if_down
+function if_interface_down
 {
    local _interface="$1"
-   if_if_downup "$_interface" down
+   if_interface_downup "$_interface" down
    return $?
 }
 
-function if_if_up
+function if_interface_up
 {
    local _interface="$1"
-   if_if_downup "$_interface" up
+   if_interface_downup "$_interface" up
    return $?
 }
 
-function if_if_haslink
+function if_interface_haslink
 {
    local _interface="$1"
    local _carrier="/sys/class/net/$_interface/carrier"
 
-   if ! ( if_if_exists "$_interface" ); then return 1; fi
+   if ! ( if_interface_exists "$_interface" ); then return 1; fi
    test -r "$_carrier" -a "$(cat "$_carrier" 2>/dev/null)" == "1"
    return $?
 }
 
-function if_if_address_canacquire
+function if_interface_address_canacquire
 {
    local _family="$1"
 
@@ -191,44 +222,44 @@ function if_if_address_canacquire
    esac
 }
 
-function if_if_address_get
+function if_interface_address_get
 {
    local _interface="$1"
    local _family="$2"
 
-   if ! if_if_address_canacquire "$_family"; then return 1; fi
-   if ! if_if_exists "$_interface"; then return 2; fi
+   if ! if_interface_address_canacquire "$_family"; then return 1; fi
+   if ! if_interface_exists "$_interface"; then return 2; fi
 
    ifconfig "$_interface" | grep -o -P "$_family\s+.*" | awk '{ print $2 }'
    if [ "$?" != "0" ]; then return 3; fi
    return 0
 }
 
-function if_if_address_set
+function if_interface_address_set
 {
    local _interface="$1"
    local _family="$2"
    local _address="$3"
 
-   if ! if_if_address_canacquire "$_family"; then return 1; fi
-   if ! if_if_exists "$_interface"; then return 2; fi
+   if ! if_interface_address_canacquire "$_family"; then return 1; fi
+   if ! if_interface_exists "$_interface"; then return 2; fi
 
    ifconfig "$_interface" "$_family" "$_address"
    if [ "$?" != "0" ]; then return 3; fi
    return 0
 }
 
-function if_if_link_wait
+function if_interface_link_wait
 {
    local _device="$1"
 
-   if ! if_if_exists "$_device"; then return 1; fi
-   if ! if_if_isup "$_device"; then return 2; fi
+   if ! if_interface_exists "$_device"; then return 1; fi
+   if ! if_interface_isup "$_device"; then return 2; fi
 
    local _timeout="0"
 
    while [ "$_timeout" -lt "$ORK_IF_LINK_TIMEOUT" ]; do
-      if if_if_haslink "$_device"; then break; fi
+      if if_interface_haslink "$_device"; then break; fi
       sleep 1
       _timeout="$(($_timeout+1))"
    done
@@ -238,110 +269,6 @@ function if_if_link_wait
    fi
 
    return 0
-}
-
-function if_dev_root
-{
-   ork_pathcat "$(if_root)" "$ORK_IF_DEVICE_PATH"
-   return 0
-}
-
-function if_dev_skeletons
-{
-   ork_pathcat "$(if_root)" "$ORK_IF_DEVICE_SKELETONS"
-   return 0
-}
-
-function if_dev_path
-{
-   local _device="$1"
-   ork_pathcat "$(if_dev_root)" "$(stdlib_pathify "$_device")"
-   return 0
-}
-
-function if_dev_skeletons_path
-{
-   local _device="$1"
-   ork_pathcat "$(if_dev_skeletons)" "$(stdlib_pathify "$_device")"
-   return 0
-}
-
-function if_dev_exists
-{
-   local _device="$1"
-
-   test -d "$(if_dev_path "$_device")"
-   return $?
-}
-
-function if_dev_create
-{
-   local _device="$1"
-   if if_dev_exists "$_device"; then return 1; fi
-
-   local _dev_path="$(if_dev_path "$_device")"
-   if ! mkdir -p "$_dev_path"; then return 2; fi
-
-   if [ -d "$(if_dev_skeletons_path "$_device")" ]; then
-      if ! cp "$(if_dev_skeletons_path "$_device")/*" "$_dev_path/"; then return 3; fi
-   else
-      local _initial_files="{ifup,ifdown,config}"
-      if ! touch "$_dev_path/$_initial_files"; then return 4; fi
-      if ! chmod +x "$_dev_path/$_initial_files"; then return 5; fi
-   fi
-
-   return 0
-}
-
-function if_dev_destroy
-{
-   local _device="$1"
-   if ! if_dev_exists "$_device"; then return 1; fi
-
-   local _dev_path="$(if_dev_path "$_device")"
-   if ! rm -rf "$_dev_path"; then return 2; fi
-   return 0
-}
-
-function if_dev_downup
-{
-   local _device="$1"
-   local _downup="$2"
-   if [ "$_downup" != "up" -a "$_downup" != "down" ]; then return 1; fi
-
-   local _downup_args="${@:3}"
-   if ! if_dev_exists "$_device"; then return 2; fi
-
-   local _dev_path="$(if_dev_path "$_device")"
-   if [ -e "$_dev_path/config" ]; then
-      source "$_dev_path/config"
-      if [ "$?" != "0" ]; then return 3; fi
-   fi
-
-   if [ ! -x "$_dev_path/ifup" ]; then return 4; fi
-
-   "$_dev_path/if$_downup" "$_downup_args"
-   if [ "$?" != "0" ]; then return 5; fi
-
-   return 0
-}
-
-function if_dev_down
-{
-   local _device="$1"
-   local _downargs="${@:2}"
-
-   if_dev_downup "$_device" down "$_downargs"
-   return $?
-}
-
-function if_dev_up
-{
-   local _device="$1"
-   local _upargs="${@:2}"
-
-   if_dev_downup "$_device" up "$_upargs"
-   return $?
 }
 
 ORK_IF_LINK_TIMEOUT="30"
