@@ -3,6 +3,25 @@
 source orkhideya
 ork_include stdlib
 
+function net_root
+{
+   ork_configpath "net"
+   return 0
+}
+
+function net_class_root
+{
+   ork_pathcat "$(net_root)" 
+}
+
+function net_class_exists
+{
+}
+
+function net_class_new
+{
+}
+
 function net_if_exists
 {
    local _interface="$1"
@@ -214,12 +233,6 @@ function net_if_link_wait
    return 0
 }
 
-function net_root
-{
-   ork_pathcat "$(ork_pathroot etc)" "$ORK_NET_PATH"
-   return 0
-}
-
 function net_dev_root
 {
    ork_pathcat "$(net_root)" "$ORK_NET_DEVICE_PATH"
@@ -325,6 +338,7 @@ function net_dev_up
 }
 
 ORK_NET_LINK_TIMEOUT="30"
-ORK_NET_PATH="net"
-ORK_NET_DEVICE_PATH="dev"
-ORK_NET_DEVICE_SKELETONS="skeletons"
+ORK_NET_DEV_PATH="dev"
+ORK_NET_CLASS_PATH="class"
+
+ork_reconfigure "net"

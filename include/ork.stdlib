@@ -9,24 +9,22 @@ function stdlib_trap
 
    if [ "$_status" != "0" ]; then
       stdout_error "Execution failed (status: $_status)"
+
+      if [ -n "$STDLIB_TRAP_FUNCTION" ]; then
+         stdout_error "Running clean-up function $(stdout_color_wrap main-focused "$STDLIB_TRAP_FUNCTION")."
+         $STDLIB_TRAP_FUNCTION
+      fi
+
       exit 1
    fi
 
    return 0
 }
 
-function stdlib_clean_trap
+function stdlib_trap_function
 {
-   local _function="$1"
-   local _commands="$@"
-   local _status="$(stdlib_trap "$_commands")"
-   _status="$?"
-
-   if [ "$_status" == "1" ]; then
-      eval "$_function"
-      exit 1
-   fi
-
+   local _trap_function="$1"
+   STDLIB_TRAP_FUNCTION="$_trap_function"
    return 0
 }
 
