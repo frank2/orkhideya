@@ -15,7 +15,7 @@ function proc_pid_root
    return 0
 }
 
-function proc_pidfile
+function proc_pid_file
 {
    local _label="$1"
    echo "$(proc_pid_root)/$_label"
@@ -26,7 +26,7 @@ function proc_exists
 {
    local _label="$1"
 
-   test -e "$(proc_pidfile $_label)"
+   test -e "$(proc_pid_file $_label)"
    return $?
 }
 
@@ -35,7 +35,7 @@ function proc_pid
    local _label="$1"
 
    if ! proc_exists "$_label"; then return 1; fi
-   cat "$(proc_pidfile "$_label")"
+   cat "$(proc_pid_file "$_label")"
 
    if [ "$?" != "0" ]; then return 2; fi
    return 0
@@ -89,9 +89,93 @@ function proc_kill
       proc_silent kill -9 "$_pid"
    fi
 
-   _pidfile="$(proc_pidfile "$_label")"
-   proc_silent rm -rf "$_pidfile"
+   _pid_file="$(proc_pid_file "$_label")"
+   proc_silent rm -rf "$_pid_file"
+   return 0
+}
+
+function proc_config_run_file
+{
+   local _config="$1"
+   echo "$(proc_root)/$(stdlib_pathify "$_config")/$ORK_PROC_RUN_FILE"
+   return 0
+}
+
+function proc_config_kill_file
+{
+   local _config="$1"
+   echo "$(proc_root)/$(stdlib_pathify "$_config")/$ORK_PROC_KILL_FILE"
+   return 0
+}
+
+function proc_config_run
+{
+   local _config="$1"
+   local _args="${@:2}"
+   local _file="$(stdlib_filesearch "$(proc_root)" "$(stdlib_pathify "$_config")" "$ORK_PROC_RUN_FILE")"
+
+   if [ ! -x "$_file" ]; then return 1; fi
+
+   local _commandline="$($_file "$_args")"
+   if [ -z "$_commandline" ]; then return 2; fi
+
+   echo "$_commandline"
+   return 0
+}
+
+function proc_config_kill
+{
+   local _config="$1"
+   local _args="${@:2}"
+   local _file="$(stdlib_filesearch "$(proc_root)" "$(stdlib_pathify "$_config")" "$ORK_PROC_KILL_FILE")"
+
+   if [ ! -x "$_file" ]; then return 1; fi
+
+   $_file "$_args"
+   if [ "$?" != "0" ]; then return 2; fi
+   return 0
+}
+
+function proc_config_run_exists
+{
+   local _config="$1"
+   test -e "$(stdlib_filesearch $(proc_config_run_file "$_config"))"
+   return $?
+}
+
+function proc_config_kill_exists
+{
+   local _config="$1"
+   test -e "$(proc_config_kill_file "$_config")"
+   return $?
+}
+
+   local _config_file="$(proc_config_run_file "$_config")"
+   if [ ! -x "$_config_file" ]; then return 2; fi
+
+   local _commandline="$($_config_file "$_args")"
+   if [ -z "$_commandline" ]; then return 3; fi
+
+   echo "$_commandline"
+   return 0
+}
+
+function proc_config_kill
+{
+   local _config="$1"
+   local _args="${@:2}"
+
+   ! proc_config_kill_exists "$_config" && return 1
+
+   local _config_file="$(proc_config_kill_file "$_config")"
+   if [ ! -x "$_config_file" ]; then return 2; fi
+
+   $_config_file "$_args"
+   if [ "$?" != "0" ]; then return 3; fi
+
    return 0
 }
 
 ORK_PROC_PID_PATH="pid"
+ORK_PROC_RUN_FILE="run"
+ORK_PROC_KILL_FILE="kill"
