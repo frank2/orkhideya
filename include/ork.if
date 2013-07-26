@@ -5,7 +5,7 @@ ork_include stdlib
 
 function if_root
 {
-   ork_configpath "net"
+   ork_configpath "if"
    return 0
 }
 
