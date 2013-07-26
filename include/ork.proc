@@ -94,20 +94,6 @@ function proc_kill
    return 0
 }
 
-function proc_config_run_file
-{
-   local _config="$1"
-   echo "$(proc_root)/$(stdlib_pathify "$_config")/$ORK_PROC_RUN_FILE"
-   return 0
-}
-
-function proc_config_kill_file
-{
-   local _config="$1"
-   echo "$(proc_root)/$(stdlib_pathify "$_config")/$ORK_PROC_KILL_FILE"
-   return 0
-}
-
 function proc_config_run
 {
    local _config="$1"
@@ -133,30 +119,6 @@ function proc_config_kill
 
    $_file "$_args"
    if [ "$?" != "0" ]; then return 2; fi
-   return 0
-}
-
-function proc_config_run_exists
-{
-   local _config="$1"
-   test -e "$(stdlib_filesearch $(proc_config_run_file "$_config"))"
-   return $?
-}
-
-function proc_config_kill_exists
-{
-   local _config="$1"
-   test -e "$(proc_config_kill_file "$_config")"
-   return $?
-}
-
-   local _config_file="$(proc_config_run_file "$_config")"
-   if [ ! -x "$_config_file" ]; then return 2; fi
-
-   local _commandline="$($_config_file "$_args")"
-   if [ -z "$_commandline" ]; then return 3; fi
-
-   echo "$_commandline"
    return 0
 }
 
