@@ -62,8 +62,7 @@ function if_class_new
    local _new_device="$($_class_create)"
    if [ "$?" != "0" ]; then return 3; fi
 
-   local _dev_path="$(if_dev_path "$_new_device")"
-   if [ -d "$_dev_path" ]; then return 4; fi
+   if_dev_exists "$_new_device" && return 4
 
    local _dev_file="$_dev_path/class"
    stdlib_forcepath "$_dev_file"
@@ -74,76 +73,18 @@ function if_class_new
    return 0
 }
 
-function if_ipv4mask
+function if_interface_unique_name
 {
-   local _size="$1"
-   if [ "$_size" -lt 0 -o "$_size" -gt 32 ]; then return 1; fi
+   local _root="$1"
+   local _suffix="0"
+   local _new_name="${_root}${_suffix}"
 
-   local _inversion="$((32 - $_size))"
-
-   echo "$(( (2 ** $_size - 1) << $_inversion ))"
-   return 0
-}
-
-function if_isipv4
-{
-   local _address="$1"
-
-   echo $_address | grep -q -P '((\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
-   return $?
-}
-
-function if_iscidr
-{
-   local _address="$1"
-   if ! ( echo "$_address" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_address")" -gt 1 ]; then return 1; fi
-
-   local _network="$(echo "$_address" | awk -F '/' '{ print $2 }')"
-   if ! ( echo $_network | grep -q '^[0-9]+$' ); then return 2; fi
-
-   if_isipv4 "$_address" && [ "$_network" -ge "0" -a "$_network" -le "32" ];
-   return $?
-}
-
-function if_ipv4toint
-{
-   local _address="$1"
-   local _number="0"
-
-   if ! if_isipv4 "$_address"; then return 1; fi
-
-   for _chunk in $(seq 1 4); do
-      local _octet="$(echo "$_address" | awk -F '.' "{ print \$$_chunk }")"
-      _number="$(($_number | ($_octet << 32 - (8 * $_chunk))))"
+   while if_interface_exists "$_new_name"; do
+      _suffix="$(($_suffix+1))"
+      _new_name="${_root}${_suffix}"
    done
 
-   echo $_number
-   return 0
-}
-
-function if_inttoipv4
-{
-   local _number="$(stdlib_tolower "$1")"
-
-   if echo $_number | grep -q '^[0-9a-f]$'; then
-      _number="$(($_number))"
-   elif echo $_number | grep -q '[^0-9]'; then
-      return 1
-   fi
-
-   if [ "$_number" -lt "0" -o "$_number" -gt "$(if_ipv4mask 32)" ]; then return 2; fi
-
-   local _address=""
-
-   for _chunk in $(seq 1 4); do
-      if [ -n "$_address" ]; then
-         _address="${_address}."
-      fi
-
-      _address="${_address}$(( ($_number >> (32 - ($_chunk * 8))) & 0xFF ))"
-   done
-
-   echo "$_address"
+   echo $_new_name
    return 0
 }
 
@@ -268,6 +209,79 @@ function if_interface_link_wait
       return 3
    fi
 
+   return 0
+}
+
+function if_ipv4mask
+{
+   local _size="$1"
+   if [ "$_size" -lt 0 -o "$_size" -gt 32 ]; then return 1; fi
+
+   local _inversion="$((32 - $_size))"
+
+   echo "$(( (2 ** $_size - 1) << $_inversion ))"
+   return 0
+}
+
+function if_isipv4
+{
+   local _address="$1"
+
+   echo $_address | grep -q -P '((\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
+   return $?
+}
+
+function if_iscidr
+{
+   local _address="$1"
+   if ! ( echo "$_address" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_address")" -gt 1 ]; then return 1; fi
+
+   local _network="$(echo "$_address" | awk -F '/' '{ print $2 }')"
+   if ! ( echo $_network | grep -q '^[0-9]+$' ); then return 2; fi
+
+   if_isipv4 "$_address" && [ "$_network" -ge "0" -a "$_network" -le "32" ];
+   return $?
+}
+
+function if_ipv4toint
+{
+   local _address="$1"
+   local _number="0"
+
+   if ! if_isipv4 "$_address"; then return 1; fi
+
+   for _chunk in $(seq 1 4); do
+      local _octet="$(echo "$_address" | awk -F '.' "{ print \$$_chunk }")"
+      _number="$(($_number | ($_octet << 32 - (8 * $_chunk))))"
+   done
+
+   echo $_number
+   return 0
+}
+
+function if_inttoipv4
+{
+   local _number="$(stdlib_tolower "$1")"
+
+   if echo $_number | grep -q '^[0-9a-f]$'; then
+      _number="$(($_number))"
+   elif echo $_number | grep -q '[^0-9]'; then
+      return 1
+   fi
+
+   if [ "$_number" -lt "0" -o "$_number" -gt "$(if_ipv4mask 32)" ]; then return 2; fi
+
+   local _address=""
+
+   for _chunk in $(seq 1 4); do
+      if [ -n "$_address" ]; then
+         _address="${_address}."
+      fi
+
+      _address="${_address}$(( ($_number >> (32 - ($_chunk * 8))) & 0xFF ))"
+   done
+
+   echo "$_address"
    return 0
 }
 
