@@ -28,6 +28,12 @@ function stdlib_trap_function
    return 0
 }
 
+function stdlib_untrap
+{
+   STDLIB_TRAP_FUNCTION=""
+   return 0
+}
+
 function stdlib_isroot
 {
    test "$(id -u)" == 0
