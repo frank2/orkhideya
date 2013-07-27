@@ -163,6 +163,9 @@ function proc_template_exec
 
    _commandline="$(proc_template_run "$_template" "$_args")"
    if [ -z "$_commandline" ]; then return 1; fi
+
+   proc_label_spawn "$_label" "$_args"
+   local _status="$?"
 }
 
 ORK_PROC_PID_PATH="pid"
