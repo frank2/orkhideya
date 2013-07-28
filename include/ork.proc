@@ -109,8 +109,7 @@ function proc_label_kill
    if proc_running "$_label"; then
       local _pid="$(proc_pid "$_label")"
       proc_silent kill -9 "$_pid"
-   fi
-
+   fi 
    _pid_file="$(proc_pid_file "$_label")"
    proc_silent rm -rf "$_pid_file"
    return 0
@@ -150,7 +149,7 @@ function proc_template_kill
 
    if [ ! -x "$_file" ]; then return 1; fi
 
-   "$_file" $_args
+   "$_file" $_template $_args
    if [ "$?" != "0" ]; then return 2; fi
    return 0
 }
@@ -169,6 +168,15 @@ function proc_template_exec
 
    if [ "$_status" != "0" ]; then return 2; fi
    return 0
+}
+
+function proc_template_has_arg
+{
+   local _arg="$1"
+   local _args="${@:2}"
+
+   echo "$_args" | grep -E -q "([[:space:]]+$_arg[[:space:]]|[[:space:]]+$_arg\$)"
+   return $?
 }
 
 ORK_PROC_PID_PATH="pid"
