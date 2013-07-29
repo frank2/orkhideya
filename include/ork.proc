@@ -88,7 +88,7 @@ function proc_template_has_arg
    local _arg="$1"
    local _args="${@:2}"
 
-   echo "$_args" | grep -E -q "([[:space:]]+$_arg[[:space:]]|[[:space:]]+$_arg\$)"
+   echo "$_args" | grep -E -q "([[:space:]]+$_arg[[:space:]]+|[[:space:]]+$_arg\$|^$_arg[[:space:]]+|^$_arg\$)"
    return $?
 }
 
