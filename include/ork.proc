@@ -44,6 +44,54 @@ function proc_kill
    return 0
 }
 
+function proc_template_exists
+{
+   local _template="$1"
+   test -e "$(proc_template_root)/$(stdlib_pathify "$_template")"
+   return $?
+}
+
+function proc_template_run
+{
+   local _template="$1"
+   local _args="${@:2}"
+
+   ! proc_template_exists "$_template" && return 1
+   local _file="$(stdlib_filesearch "$(proc_template_root)" "$(stdlib_pathify "$_template")" "$ORK_PROC_TEMPLATE_RUN_FILE")"
+
+   if [ ! -x "$_file" ]; then return 2; fi
+
+   local _commandline="$($_file "$_args")"
+   if [ -z "$_commandline" ]; then return 3; fi
+
+   echo "$_commandline"
+   return 0
+}
+
+function proc_template_kill
+{
+   local _template="$1"
+   local _args="${@:2}"
+
+   ! proc_template_exists "$_template" && return 1
+   local _file="$(stdlib_filesearch "$(proc_template_root)" "$(stdlib_pathify "$_template")" "$ORK_PROC_TEMPLATE_KILL_FILE")"
+
+   if [ ! -x "$_file" ]; then return 1; fi
+
+   "$_file" $_args
+   if [ "$?" != "0" ]; then return 2; fi
+   return 0
+}
+
+function proc_template_has_arg
+{
+   local _arg="$1"
+   local _args="${@:2}"
+
+   echo "$_args" | grep -E -q "([[:space:]]+$_arg[[:space:]]|[[:space:]]+$_arg\$)"
+   return $?
+}
+
 function proc_label_pid_file
 {
    local _label="$1"
@@ -115,46 +163,7 @@ function proc_label_kill
    return 0
 }
 
-function proc_template_exists
-{
-   local _template="$1"
-   test -e "$(proc_template_root)/$(stdlib_pathify "$_template")"
-   return $?
-}
-
-function proc_template_run
-{
-   local _template="$1"
-   local _args="${@:2}"
-
-   ! proc_template_exists "$_template" && return 1
-   local _file="$(stdlib_filesearch "$(proc_template_root)" "$(stdlib_pathify "$_template")" "$ORK_PROC_TEMPLATE_RUN_FILE")"
-
-   if [ ! -x "$_file" ]; then return 2; fi
-
-   local _commandline="$($_file "$_args")"
-   if [ -z "$_commandline" ]; then return 3; fi
-
-   echo "$_commandline"
-   return 0
-}
-
-function proc_template_kill
-{
-   local _template="$1"
-   local _args="${@:2}"
-
-   ! proc_template_exists "$_template" && return 1
-   local _file="$(stdlib_filesearch "$(proc_template_root)" "$(stdlib_pathify "$_template")" "$ORK_PROC_TEMPLATE_KILL_FILE")"
-
-   if [ ! -x "$_file" ]; then return 1; fi
-
-   "$_file" $_template $_args
-   if [ "$?" != "0" ]; then return 2; fi
-   return 0
-}
-
-function proc_template_exec
+function proc_label_template_exec
 {
    local _label="$1"
    local _template="$2"
@@ -163,20 +172,24 @@ function proc_template_exec
    _commandline="$(proc_template_run "$_template" "$_args")"
    if [ -z "$_commandline" ]; then return 1; fi
 
-   proc_label_spawn "$_label" "$_args"
+   proc_label_spawn "$_label" "$_commandline"
    local _status="$?"
 
    if [ "$_status" != "0" ]; then return 2; fi
    return 0
 }
 
-function proc_template_has_arg
+function proc_label_template_kill
 {
-   local _arg="$1"
-   local _args="${@:2}"
+   local _label="$1"
+   local _template="$2"
+   local _args="${@:3}"
 
-   echo "$_args" | grep -E -q "([[:space:]]+$_arg[[:space:]]|[[:space:]]+$_arg\$)"
-   return $?
+   ! proc_label_running "$_label" && return 1
+   ! proc_template_kill "$_template" "$_args" && return 2
+   ! proc_label_kill "$_label" && return 3
+
+   return 0
 }
 
 ORK_PROC_PID_PATH="pid"
