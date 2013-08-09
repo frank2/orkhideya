@@ -1,0 +1,15 @@
+#!/bin/bash
+
+source orkhideya
+
+function mac_random
+{
+   local _chunks="00"
+
+   for i in $(seq 1 5); do
+      _chunks="$_chunks:$(printf '%02x' $(($RANDOM % 256)))"
+   done
+
+   echo $_chunks
+   return 0
+}

@@ -213,19 +213,6 @@ function if_interface_link_wait
    return 0
 }
 
-
-function if_random_mac
-{
-   local _chunks="00"
-
-   for i in $(seq 1 5); do
-      _chunks="$_chunks:$(printf '%02x' $(($RANDOM % 256)))"
-   done
-
-   echo $_chunks
-   return 0
-}
-
 ORK_IF_LINK_TIMEOUT="30"
 ORK_IF_DEV_PATH="dev"
 ORK_IF_CLASS_PATH="class"
