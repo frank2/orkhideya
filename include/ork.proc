@@ -44,6 +44,15 @@ function proc_kill
    return 0
 }
 
+function proc_timed_kill
+{
+   _pid="$1"
+   _timeout="$2"
+
+   sleep $_timeout && proc_kill "$_pid"
+   return $?
+}
+
 function proc_template_exists
 {
    local _template="$1"
@@ -71,14 +80,15 @@ function proc_template_run
 function proc_template_kill
 {
    local _template="$1"
-   local _args="${@:2}"
+   local _pid="$2"
+   local _args="${@:3}"
 
    ! proc_template_exists "$_template" && return 1
    local _file="$(stdlib_filesearch "$(proc_template_root)" "$(stdlib_pathify "$_template")" "$ORK_PROC_TEMPLATE_KILL_FILE")"
 
    if [ ! -x "$_file" ]; then return 1; fi
 
-   "$_file" $_args
+   "$_file" $_pid $_args
    if [ "$?" != "0" ]; then return 2; fi
    return 0
 }
@@ -158,6 +168,7 @@ function proc_label_kill
       local _pid="$(proc_pid "$_label")"
       proc_silent kill -9 "$_pid"
    fi 
+
    _pid_file="$(proc_pid_file "$_label")"
    proc_silent rm -rf "$_pid_file"
    return 0
@@ -176,18 +187,25 @@ function proc_label_template_exec
    local _status="$?"
 
    if [ "$_status" != "0" ]; then return 2; fi
+
+   local _template_file="$(stdlib_forcepath "$(proc_pid_root)/${_label}.template")"
    return 0
 }
 
 function proc_label_template_kill
 {
    local _label="$1"
-   local _template="$2"
-   local _args="${@:3}"
+   local _args="${@:2}"
 
    ! proc_label_running "$_label" && return 1
-   ! proc_template_kill "$_template" "$_args" && return 2
-   ! proc_label_kill "$_label" && return 3
+
+   local _template_file="$(stdlib_forcepath "$(proc_pid_root)/${_label}.template")"
+   ! test -e "$_template_file" && return 2 
+
+   local _template="$(cat "$_template_file")"
+   ! proc_template_exists "$_template" && return 3
+
+   ! proc_template_kill "$_template" "$(proc_label_pid "$_label")" "$_args" && return 4
 
    return 0
 }

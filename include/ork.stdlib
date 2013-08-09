@@ -21,14 +21,14 @@ function stdlib_trap
    return 0
 }
 
-function stdlib_trap_function
+function stdlib_trap_cleanup_push
 {
    local _trap_function="$1"
-   STDLIB_TRAP_FUNCTION="$_trap_function"
+   STDLIB_TRAP_FUNCTIONS="$_trap_function $STDLIB_TRAP_FUNCTIONS"
    return 0
 }
 
-function stdlib_untrap
+function stdlib_trap_cleanup_pop
 {
    STDLIB_TRAP_FUNCTION=""
    return 0

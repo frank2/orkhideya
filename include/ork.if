@@ -52,6 +52,7 @@ function if_dev_exists
 function if_class_new
 {
    local _class="$1"
+   local _args="${@:2}"
    ! if_class_exists "$_class" && return 1
 
    local _class_path="$(if_class_path "$_class")"
@@ -59,7 +60,7 @@ function if_class_new
    local _class_create="$_class_path/create"
    [ ! -x "$_class_create" ] && return 2
 
-   local _new_device="$($_class_create)"
+   local _new_device="$($_class_create "$_args")"
    if [ "$?" != "0" ]; then return 3; fi
 
    if_dev_exists "$_new_device" && return 4
