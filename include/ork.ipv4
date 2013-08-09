@@ -1,0 +1,76 @@
+#!/bin/bash
+
+source orkhideya
+
+function ipv4_mask
+{
+   local _size="$1"
+   if [ "$_size" -lt 0 -o "$_size" -gt 32 ]; then return 1; fi
+
+   local _inversion="$((32 - $_size))"
+
+   echo "$(( (2 ** $_size - 1) << $_inversion ))"
+   return 0
+}
+
+function ipv4_valid
+{
+   local _address="$1"
+
+   echo $_address | grep -q -P '((\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
+   return $?
+}
+
+function ipv4_iscidr
+{
+   local _address="$1"
+   if ! ( echo "$_address" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_address")" -gt 1 ]; then return 1; fi
+
+   local _network="$(echo "$_address" | awk -F '/' '{ print $2 }')"
+   if ! ( echo $_network | grep -q '^[0-9]+$' ); then return 2; fi
+
+   ipv4_valid "$_address" && [ "$_network" -ge "0" -a "$_network" -le "32" ];
+   return $?
+}
+
+function ipv4_to_int
+{
+   local _address="$1"
+   local _number="0"
+
+   if ! ipv4_valid "$_address"; then return 1; fi
+
+   for _chunk in $(seq 1 4); do
+      local _octet="$(echo "$_address" | awk -F '.' "{ print \$$_chunk }")"
+      _number="$(($_number | ($_octet << 32 - (8 * $_chunk))))"
+   done
+
+   echo $_number
+   return 0
+}
+
+function ipv4_from_int
+{
+   local _number="$(stdlib_tolower "$1")"
+
+   if echo $_number | grep -q '^[0-9a-f]$'; then
+      _number="$(($_number))"
+   elif echo $_number | grep -q '[^0-9]'; then
+      return 1
+   fi
+
+   if [ "$_number" -lt "0" -o "$_number" -gt "$(ipv4_mask 32)" ]; then return 2; fi
+
+   local _address=""
+
+   for _chunk in $(seq 1 4); do
+      if [ -n "$_address" ]; then
+         _address="${_address}."
+      fi
+
+      _address="${_address}$(( ($_number >> (32 - ($_chunk * 8))) & 0xFF ))"
+   done
+
+   echo "$_address"
+   return 0
+}
