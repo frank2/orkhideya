@@ -57,15 +57,92 @@ function iw_ap_bssid
    return 0
 }
 
+function iw_ap_preup
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _device="$2"
+   ! if_dev_exists "$_device" && return 2
+
+   local _preup_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "pre-up")"
+   [ ! -e "$_preup_file" ] && return 0 # if it doesn't exist, that's okay
+   [ ! -x "$_preup_file" ] && return 3 # if it's not exeutable, that ain't cool man!
+
+   ! "$_preup_file" "$_device" && return 4
+   return 0
+}
+
+function iw_ap_postup
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _device="$2"
+   ! if_dev_exists "$_device" && return 2
+
+   local _postup_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "post-up")"
+   [ ! -e "$_postup_file" ] && return 0 # if it doesn't exist, that's okay
+   [ ! -x "$_postup_file" ] && return 3 # if it's not exeutable, that ain't cool man!
+
+   ! "$_postup_file" "$_device" && return 4
+   return 0
+}
+
+function iw_ap_predown
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _device="$2"
+   ! if_dev_exists "$_device" && return 2
+
+   local _predown_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "pre-down")"
+   [ ! -e "$_predown_file" ] && return 0 # if it doesn't exist, that's okay
+   [ ! -x "$_predown_file" ] && return 3 # if it's not exeutable, that ain't cool man!
+
+   ! "$_predown_file" "$_device" && return 4
+   return 0
+}
+
+function iw_ap_postdown
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _device="$2"
+   ! if_dev_exists "$_device" && return 2
+
+   local _postdown_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "post-down")"
+   [ ! -e "$_postdown_file" ] && return 0 # if it doesn't exist, that's okay
+   [ ! -x "$_postdown_file" ] && return 3 # if it's not exeutable, that ain't cool man!
+
+   ! "$_postdown_file" "$_device" && return 4
+   return 0
+}
+
 function iw_ap_connect
 {
    local _ap="$1"
    local _device="$2"
-   ! if_dev_is_up "$_device" && ! if_dev_up "$_device" && return 1
+   ! if_dev_exists "$_device" && return 1
+   ! iw_dev_set_mode "$_device" managed && return 2
 
-   local _bssid="$(iw_ap_bssid "$_ap
+   local _bssid="$(iw_ap_bssid "$_ap")"
+   [ -z "$_bssid" ] && return 3
 
-ORK_IW_SCAN_RETRY="3"
+   local _essid="$(iw_ap_essid "$_ap")"
+   [ -z "$_essid" ] && return 4
+
+   local _channel="$(iw_bssid_channel "$_bssid")"
+   [ -z "$_channel" ] && return 5
+   ! iw_dev_set_channel "$_device" "$_channel" && return 6
+   ! iw_dev_set_essid "$_device" "$_essid" && return 7
+   ! iw_dev_set_bssid "$_device" "$_bssid" && return 8
+
+   if [ -x "$(iw_ap_path
+
+ORK_IW_SCAN_RETRY="5"
 ORK_IW_AP_PATH="ap"
 
 ork_reconfigure "iw"
