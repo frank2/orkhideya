@@ -124,25 +124,101 @@ function iw_ap_postdown
 function iw_ap_connect
 {
    local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
    local _device="$2"
-   ! if_dev_exists "$_device" && return 1
-   ! iw_dev_set_mode "$_device" managed && return 2
+   ! if_dev_exists "$_device" && return 2
+   ! iw_dev_set_mode "$_device" managed && return 3
 
    local _bssid="$(iw_ap_bssid "$_ap")"
-   [ -z "$_bssid" ] && return 3
+   [ -z "$_bssid" ] && return 4
 
    local _essid="$(iw_ap_essid "$_ap")"
-   [ -z "$_essid" ] && return 4
+   [ -z "$_essid" ] && return 5
 
    local _channel="$(iw_bssid_channel "$_bssid")"
-   [ -z "$_channel" ] && return 5
-   ! iw_dev_set_channel "$_device" "$_channel" && return 6
-   ! iw_dev_set_essid "$_device" "$_essid" && return 7
-   ! iw_dev_set_bssid "$_device" "$_bssid" && return 8
+   [ -z "$_channel" ] && return 6
+   ! iw_dev_set_essid "$_device" "$_essid" && return 8
+   ! iw_dev_set_bssid "$_device" "$_bssid" && return 9
 
-   ! iw_ap_preup "$_ap" "$_device" && return 9
-   ! if_dev_up "$_device" && return 10
-   ! iw_ap_postup "$_ap" "$_device" && return 11
+   ! iw_ap_preup "$_ap" "$_device" && return 10
+   ! if_dev_up "$_device" && return 11
+   ! iw_ap_postup "$_ap" "$_device" && return 12
+
+   return 0
+}
+
+function iw_ap_disconnect
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _device="$2"
+   ! if_dev_exists "$_device" && return 2
+
+   ! iw_ap_predown "$_ap" "$_device" && return 3
+   ! if_dev_down "$_device" && return 4
+   ! iw_ap_postdown "$_ap" "$_device" && return 5
+
+   return 0
+}
+
+function iw_dev_set_mode
+{
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   [ -z "$_interface" ] && return 2
+   ! if_interface_exists "$_interface" && return 3
+
+   local _mode="$2"
+   ! iwconfig "$_interface" mode "$_mode" && return 4
+
+   return 0
+}
+
+function iw_dev_set_channel
+{
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   [ -z "$_interface" ] && return 2
+   ! if_interface_exists "$_interface" && return 3
+
+   local _channel="$2"
+   ! iwconfig "$_interface" channel "$_channel" && return 4
+
+   return 0
+}
+
+function iw_dev_set_essid
+{
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   [ -z "$_interface" ] && return 2
+   ! if_interface_exists "$_interface" && return 3
+
+   local _essid="$2"
+   ! iwconfig "$_interface" essid "$_essid" && return 4
+
+   return 0
+}
+
+function iw_dev_set_bssid
+{
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   [ -z "$_interface" ] && return 2
+   ! if_interface_exists "$_interface" && return 3
+
+   local _bssid="$2"
+   ! iwconfig "$_interface" ap "$_bssid" && return 4
 
    return 0
 }

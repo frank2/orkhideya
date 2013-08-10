@@ -1,0 +1,36 @@
+#!/bin/bash
+
+source orkhideya
+ork_include stdlib
+
+function net_root
+{
+   ork_configpath "net"
+   return 0
+}
+
+function net_path
+{
+   local _network="$1"
+   ork_pathcat "$(net_root)" "$ORK_NET_NETWORKS"
+   return 0
+}
+
+function net_exists
+{
+   local _network="$1"
+   test -d "$(net_path "$_network")"
+   return $?
+}
+
+function net_connect
+{
+   local _network="$1"
+   ! net_exists "$_network" && return 1
+
+   local _connect_file="$(stdlib_filesearch  "$(net_root)" "$(stdlib_pathify "$_network")" 'connect')"
+   [ -z "$_connect_file" ] && return 2
+   [ ! -x "$_connect_file" ] && return 3
+
+ORK_NET_NETWORKS="networks"
+ork_reconfigure "net"
