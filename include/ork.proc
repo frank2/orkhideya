@@ -70,7 +70,7 @@ function proc_template_command
 
    if [ ! -x "$_file" ]; then return 2; fi
 
-   local _commandline="$($_file "$_args")"
+   local _commandline="$("$_file" $_args)"
    if [ -z "$_commandline" ]; then return 3; fi
 
    echo "$_commandline"
@@ -88,7 +88,7 @@ function proc_template_kill
 
    if [ ! -x "$_file" ]; then return 1; fi
 
-   "$_file" $_pid $_args
+   "$_file" "$_pid" $_args
    if [ "$?" != "0" ]; then return 2; fi
    return 0
 }
@@ -154,7 +154,7 @@ function proc_label_spawn
 
    stdout_warning "Executing: $(stdout_color_wrap main-focused "$_commandline")"
 
-   $_commandline &>/dev/null &
+   $_commandline &
    sleep 1
 
    _resulting_pid="$(ps kstart_time ax | sort -r | grep "$_commandline" | grep -v grep | head -n1 | awk '{ print $1 }')"
@@ -184,7 +184,7 @@ function proc_label_kill
       local _template="$(cat "$_procpath/template")"
 
       ! proc_template_exists && return 3
-      ! proc_template_kill "$_template" "$_pid" "$_args" && return 4
+      ! proc_template_kill "$_template" "$_pid" $_args && return 4
    fi
 
    if proc_label_is_running "$_label"; then
@@ -202,7 +202,7 @@ function proc_label_template_exec
    local _template="$2"
    local _args="${@:3}"
 
-   _commandline="$(proc_template_command "$_template" "$_args")"
+   _commandline="$(proc_template_command "$_template" $_args)"
    [ -z "$_commandline" ] && return 1
 
    proc_label_spawn "$_label" "$_commandline"
