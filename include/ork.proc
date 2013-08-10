@@ -11,7 +11,7 @@ function proc_root
 
 function proc_pid_root
 {
-   ork_pathcat "$(ork_pathroot tmp)" "$ORK_PROC_PIDPATH"
+   ork_pathcat "$(ork_pathroot tmp)" "$ORK_PROC_PID_PATH"
    return 0
 }
 
@@ -122,7 +122,7 @@ function proc_label_pid
    local _label="$1"
    ! proc_label_exists "$_label" && return 1
 
-   local _procpath="$(proc_label_path)"
+   local _procpath="$(proc_label_path "$_label")"
    ! test -r "$_procpath/pid" && return 2
 
    cat "$_procpath/pid"
@@ -131,7 +131,7 @@ function proc_label_pid
    return 0
 }
 
-function proc_label_running
+function proc_label_is_running
 {
    local _label="$1"
 
@@ -146,18 +146,27 @@ function proc_label_spawn
    local _commandline="${@:2}"
    [ -z "$_label" ] && return 1
 
-   local _procpath="$(stdlib_forcepath "$(proc_pid_root)/$_label")"
-   [ -z "$_procpath" ] && return 2
-   [ -d "$_procpath" ] && return 3 # pid by this label exists already
+   local _pidpath="$(proc_pid_root)/$_label"
+   [ -z "$_pidpath" ] && return 2
+   [ -d "$_pidpath" ] && return 3 # pid by this label exists already
 
-   $_commandline &
-   _resulting_pid="$!"
+   local _pidfile="$(stdlib_forcepath "$_pidpath/pid")"
+
+   stdout_warning "Executing: $(stdout_color_wrap main-focused "$_commandline")"
+
+   $_commandline &>/dev/null &
+   sleep 1
+
+   _resulting_pid="$(ps kstart_time ax | sort -r | grep "$_commandline" | grep -v grep | head -n1 | awk '{ print $1 }')"
+
    if [ -z "$_resulting_pid" ]; then 
-      proc_silent rm -rf "$_procpath" 
+      stdout_error "Fork failure."
+
+      proc_silent rm -rf "$(stdlib_cdup $_pidpath)" 
       return 4
    fi
 
-   echo "$_resulting_pid" > "$_procpath/"
+   echo "$_resulting_pid" > "$_pidfile"
    return 0
 }
 
@@ -178,7 +187,7 @@ function proc_label_kill
       ! proc_template_kill "$_template" "$_pid" "$_args" && return 4
    fi
 
-   if proc_label_running "$_label"; then
+   if proc_label_is_running "$_label"; then
       local _pid="$(proc_label_pid "$_label")"
       [ -n "$_pid" ] && proc_silent kill -9 "$_pid"
    fi 
@@ -199,8 +208,8 @@ function proc_label_template_exec
    proc_label_spawn "$_label" "$_commandline"
    [ "$?" != "0" ] && return 2
 
-   local _template_file="$(stdlib_forcepath "$(proc_label_path "$_label")")"
-   echo $_template > $_template_file
+   local _template_file="$(stdlib_forcepath "$(proc_label_path "$_label")/template")"
+   echo $_template > "$_template_file"
 
    return 0
 }

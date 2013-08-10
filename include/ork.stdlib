@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source orkhideya
 ork_include stdout
 
 function stdlib_trap
@@ -11,12 +12,13 @@ function stdlib_trap
       stdout_error "Execution failed (status: $_status)"
       stdout_error "Running clean-up chain."
 
-      local _popped="$(stdlib_trap_cleanup_pop)"
+      local _popped="$(stdlib_trap_cleanup_peek)"
 
       while [ -n "$_popped" ]; do
          stdout_error "... $(stdout_color_wrap main-focused "$_popped")"
          $_popped
-         _popped="$(stdlib_trap_cleanup_pop)"
+         stdlib_trap_cleanup_pop
+         _popped="$(stdlib_trap_cleanup_peek)"
       done
 
       stdout_error "Cleanup complete."
@@ -29,15 +31,30 @@ function stdlib_trap
 function stdlib_trap_cleanup_push
 {
    local _trap_function="$1"
-   STDLIB_TRAP_FUNCTIONS="$_trap_function $STDLIB_TRAP_FUNCTIONS"
+   STDLIB_TRAP_FUNCTIONS="$_trap_function:$STDLIB_TRAP_FUNCTIONS"
+
+   return 0
+}
+
+function stdlib_trap_cleanup_peek
+{
+   if [ -z "$STDLIB_TRAP_FUNCTIONS" ]; then return 1; fi
+
+   local _function="$(echo $STDLIB_TRAP_FUNCTIONS | cut -d ':' -f 1)"
+   STDLIB_TRAP_FUNCTIONS="$(echo "$STDLIB_TRAP_FUNCTIONS" | sed -e "s/^${_function}://")"
+
+   echo $_function
+
    return 0
 }
 
 function stdlib_trap_cleanup_pop
 {
-   local _function="$(echo "$STDLIB_TRAP_FUNCTIONS" | awk '{ print $1 }')"
-   STDLIB_TRAP_FUNCTIONS="$(echo "$STDLIB_TRAP_FUNCTIONS" | awk '{ $1=""; print $0 }')"
-   echo "$_function"
+   if [ -z "$STDLIB_TRAP_FUNCTIONS" ]; then return 1; fi
+
+   local _function="$(stdlib_trap_cleanup_peek)"
+   STDLIB_TRAP_FUNCTIONS="$(echo "$STDLIB_TRAP_FUNCTIONS" | sed -e "s/^${_function}://")"
+
    return 0
 }
 
@@ -124,6 +141,8 @@ function stdlib_forcepath
    if [ -z "$_rootpath" ]; then return 1; fi
 
    if ! mkdir -p "$_rootpath"; then return 2; fi
+
+   echo "$_file"
    return 0
 }
 

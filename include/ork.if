@@ -242,10 +242,11 @@ function if_interface_link_wait
 function if_dev_is_up
 {
    local _device="$1"
-   ! if_device_exists "$_device" && return 1
+   ! if_dev_exists "$_device" && return 1
 
    local _interface="$(if_dev_interface "$_device")"
-   ! [ -z "$_interface" ] && return 2
+   [ -z "$_interface" ] && return 2
+   ! if_interface_exists "$_interface" && return 3
 
    if_interface_is_up "$_interface"
    return $?
@@ -254,7 +255,7 @@ function if_dev_is_up
 function if_dev_is_down
 {
    local _device="$1"
-   ! if_device_exists "$_device" && return 1
+   ! if_dev_exists "$_device" && return 1
 
    local _interface="$(if_dev_interface "$_device")"
    ! [ -z "$_interface" ] && return 2
@@ -270,7 +271,8 @@ function if_dev_has_link
    ! if_dev_is_up "$_device" && return 2
 
    local _interface="$(if_dev_interface "$_device")"
-   ! [ -z "$_interface" ] && return 3
+   [ -z "$_interface" ] && return 3
+   ! if_interface_exists "$_interface" && return 4
 
    if_interface_has_link "$_interface"
    return $?
@@ -283,8 +285,9 @@ function if_dev_link_wait
    ! if_dev_is_up "$_device" && return 2
 
    local _interface="$(if_dev_interface "$_device")"
-   ! [ -z "$_interface" ] && return 3
-   ! if_interface_link_wait "$_interface" && return 4
+   [ -z "$_interface" ] && return 3
+   ! if_interface_exists "$_interface" && return 4
+   ! if_interface_link_wait "$_interface" && return 5
 
    return 0
 }

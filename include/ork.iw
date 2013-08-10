@@ -135,15 +135,12 @@ function iw_ap_connect
 
    local _essid="$(iw_ap_essid "$_ap")"
    [ -z "$_essid" ] && return 5
-
-   local _channel="$(iw_bssid_channel "$_bssid")"
-   [ -z "$_channel" ] && return 6
-   ! iw_dev_set_essid "$_device" "$_essid" && return 8
-   ! iw_dev_set_bssid "$_device" "$_bssid" && return 9
-
-   ! iw_ap_preup "$_ap" "$_device" && return 10
-   ! if_dev_up "$_device" && return 11
-   ! iw_ap_postup "$_ap" "$_device" && return 12
+   ! iw_dev_set_essid "$_device" "$_essid" && return 6
+   ! iw_dev_set_bssid "$_device" "$_bssid" && return 7
+   ! iw_ap_preup "$_ap" "$_device" && return 8
+   ! if_dev_up "$_device" && return 9
+   ! iw_ap_postup "$_ap" "$_device" && return 10
+   ! if_dev_link_wait "$_device" && return 11
 
    return 0
 }

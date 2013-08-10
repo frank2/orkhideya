@@ -29,7 +29,7 @@ function net_connect
    local _args="${@:2}" 
    ! net_exists "$_network" && return 1
 
-   local _connect_file="$(stdlib_filesearch  "$(net_root)" "$(stdlib_pathify "$_network")" 'connect')"
+   local _connect_file="$(stdlib_filesearch  "$(net_path)" "$(stdlib_pathify "$_network")" 'connect')"
    [ -z "$_connect_file" ] && return 2
    [ ! -x "$_connect_file" ] && return 3
    ! "$_connect_file" "$_args" && return 4
@@ -42,7 +42,7 @@ function net_disconnect
    local _args="${@:2}" 
    ! net_exists "$_network" && return 1
 
-   local _disconnect_file="$(stdlib_filesearch  "$(net_root)" "$(stdlib_pathify "$_network")" 'disconnect')"
+   local _disconnect_file="$(stdlib_filesearch  "$(net_path)" "$(stdlib_pathify "$_network")" 'disconnect')"
    [ -z "$_disconnect_file" ] && return 2
    [ ! -x "$_disconnect_file" ] && return 3
    ! "$_disconnect_file" "$_args" && return 4
