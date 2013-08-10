@@ -21,7 +21,7 @@ function ipv4_valid
    return $?
 }
 
-function ipv4_iscidr
+function ipv4_valid_cidr
 {
    local _address="$1"
    if ! ( echo "$_address" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_address")" -gt 1 ]; then return 1; fi

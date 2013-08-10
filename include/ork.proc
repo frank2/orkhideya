@@ -60,7 +60,7 @@ function proc_template_exists
    return $?
 }
 
-function proc_template_run
+function proc_template_command
 {
    local _template="$1"
    local _args="${@:2}"
@@ -102,7 +102,7 @@ function proc_template_has_arg
    return $?
 }
 
-function proc_label_pid_file
+function proc_label_path
 {
    local _label="$1"
    echo "$(proc_pid_root)/$_label"
@@ -113,18 +113,21 @@ function proc_label_exists
 {
    local _label="$1"
 
-   test -e "$(proc_pid_file "$_label")"
+   test -e "$(proc_label_path "$_label")"
    return $?
 }
 
 function proc_label_pid
 {
    local _label="$1"
+   ! proc_label_exists "$_label" && return 1
 
-   if ! proc_label_exists "$_label"; then return 1; fi
-   cat "$(proc_pid_file "$_label")"
+   local _procpath="$(proc_label_path)"
+   ! test -r "$_procpath/pid" && return 2
 
-   if [ "$?" != "0" ]; then return 2; fi
+   cat "$_procpath/pid"
+
+   [ "$?" != "0" ] && return 3
    return 0
 }
 
@@ -132,45 +135,55 @@ function proc_label_running
 {
    local _label="$1"
 
-   if ! proc_label_exists "$_label"; then return 1; fi
-   proc_is_running "$(proc_label_pid "$_label")"
-   test -n "$(ps -p "$(proc_pid "$_label")" | tail -n+2)"
-   return $?
+   ! proc_label_exists "$_label" && return 1
+   ! proc_is_running "$(proc_label_pid "$_label")" && return 2
+   return 0
 }
 
 function proc_label_spawn
 {
    local _label="$1"
    local _commandline="${@:2}"
+   [ -z "$_label" ] && return 1
 
-   if [ -z "$_label" ]; then return 1; fi
-
-   local _filename="$(stdlib_forcepath "$(proc_pid_root)/$_label")"
-
-   if [ -z "$_filename" ]; then return 2
-   elif [ -e "$_filename" ]; then return 3 # pid by this label exists already
-   fi
+   local _procpath="$(stdlib_forcepath "$(proc_pid_root)/$_label")"
+   [ -z "$_procpath" ] && return 2
+   [ -d "$_procpath" ] && return 3 # pid by this label exists already
 
    $_commandline &
    _resulting_pid="$!"
-   if [ -z "$_resulting_pid" ]; then return 4; fi
+   if [ -z "$_resulting_pid" ]; then 
+      proc_silent rm -rf "$_procpath" 
+      return 4
+   fi
 
-   echo "$_resulting_pid" > "$_filename"
+   echo "$_resulting_pid" > "$_procpath/"
    return 0
 }
 
 function proc_label_kill
 {
    local _label="$1"
-   if ! proc_exists "$_label"; then return 1; fi
+   local _args="${@:2}"
+   ! proc_label_exists "$_label" && return 1
 
-   if proc_running "$_label"; then
-      local _pid="$(proc_pid "$_label")"
-      proc_silent kill -9 "$_pid"
+   local _procpath="$(proc_label_path "$_label")"
+   local _pid="$(proc_label_pid "$_label")"
+   [ -z "$_pid" ] && return 2
+
+   if [ -r "$_procpath/template" ]; then
+      local _template="$(cat "$_procpath/template")"
+
+      ! proc_template_exists && return 3
+      ! proc_template_kill "$_template" "$_pid" "$_args" && return 4
+   fi
+
+   if proc_label_running "$_label"; then
+      local _pid="$(proc_label_pid "$_label")"
+      [ -n "$_pid" ] && proc_silent kill -9 "$_pid"
    fi 
 
-   _pid_file="$(proc_pid_file "$_label")"
-   proc_silent rm -rf "$_pid_file"
+   proc_silent rm -rf "$_procpath"
    return 0
 }
 
@@ -180,32 +193,14 @@ function proc_label_template_exec
    local _template="$2"
    local _args="${@:3}"
 
-   _commandline="$(proc_template_run "$_template" "$_args")"
-   if [ -z "$_commandline" ]; then return 1; fi
+   _commandline="$(proc_template_command "$_template" "$_args")"
+   [ -z "$_commandline" ] && return 1
 
    proc_label_spawn "$_label" "$_commandline"
-   local _status="$?"
+   [ "$?" != "0" ] && return 2
 
-   if [ "$_status" != "0" ]; then return 2; fi
-
-   local _template_file="$(stdlib_forcepath "$(proc_pid_root)/${_label}.template")"
-   return 0
-}
-
-function proc_label_template_kill
-{
-   local _label="$1"
-   local _args="${@:2}"
-
-   ! proc_label_running "$_label" && return 1
-
-   local _template_file="$(stdlib_forcepath "$(proc_pid_root)/${_label}.template")"
-   ! test -e "$_template_file" && return 2 
-
-   local _template="$(cat "$_template_file")"
-   ! proc_template_exists "$_template" && return 3
-
-   ! proc_template_kill "$_template" "$(proc_label_pid "$_label")" "$_args" && return 4
+   local _template_file="$(stdlib_forcepath "$(proc_label_path "$_label")")"
+   echo $_template > $_template_file
 
    return 0
 }

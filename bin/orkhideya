@@ -27,14 +27,14 @@ function ork_pathroot
       root)
          echo $ORK_ROOT
          ;;
-      include)
-         ork_pathcat $ORK_INCLUDE
-         ;;
       etc)
          ork_pathcat $ORK_ETC
          ;;
       bin)
          ork_pathcat $ORK_BIN
+         ;;
+      path)
+         ork_pathcat 'include'
          ;;
       var)
          ork_pathcat $ORK_VAR
@@ -51,8 +51,17 @@ function ork_pathroot
 
 function ork_verify
 {
-   _library="$1"
-   _filename="$(ork_pathroot include)/ork.$_library"
+   local _library="$1"
+   local _ifs=$IFS
+   IFS=':'
+
+   for _path in $ORK_PATH; do
+      local _filename="$_path/ork.$_library"
+
+      if [ -r "$_filename" ]; then break; fi
+   done
+
+   IFS=$_ifs
 
    if [ ! -r "$_filename" ]; then 
       echo "$EXECUTOR: orkhideya: bad library (fatal): $_library" 1>&2
@@ -88,11 +97,19 @@ function ork_reconfigure
 
 function ork_edit
 {
-   _library="$1"
+   local _library="$1"
+   local _ifs=$IFS
+   IFS=':'
 
-   _filename="$(ork_pathroot include)/ork.$_library"
+   for _path in $ORK_PATH; do
+      local _filename="$_path/ork.$_library"
 
-   if [ ! -e "$_filename" ]; then return 1; fi
+      if [ -r "$_filename" ]; then break; fi
+   done
+
+   IFS=$_ifs
+
+   if [ ! -r "$_filename" ]; then return 1; fi
    if [ ! -x "$EDITOR" -a ! -x "$(which $EDITOR)" ]; then return 2; fi
 
    $EDITOR "$_filename"
@@ -101,26 +118,46 @@ function ork_edit
 
 function ork_include
 {
-   _library="$1"
+   local _library="$1"
+   local _ifs=$IFS
 
    if [ "$_library" == "-" ]; then
-      for _file in $(find "$(ork_pathroot include)" -name "ork.*" -type f); do
-         _library="$(echo $_file | awk -F '/' '{ print $NF }' | sed -e 's/^ork\.//g')"
+      IFS=':'
 
-         # root is the only exception. it serves a special purpose.
-         if [ "$_library" == "root" ]; then continue; fi
+      for _path in $ORK_PATH; do
+         IFS=$_ifs
 
-         ork_include $_library
-         _status="$?"
+         for _file in $(find "$_path" -name "ork.*" -type f); do
+            local _library="$(echo $_file | awk -F '/' '{ print $NF }' | sed -e 's/^ork\.//g')"
 
-         if [ "$_status" != "0" ]; then
-            return "$_status"
-         fi
+            # root is the only exception. it serves a special purpose.
+            if [ "$_library" == "root" ]; then continue; fi
+
+            ork_include $_library
+            local _status="$?"
+
+            if [ "$_status" != "0" ]; then
+               return "$_status"
+            fi
+         done
+         
+         _ifs=$IFS
+         IFS=':'
       done
+
       return 0
    fi
 
-   _filename="$(ork_pathroot include)/ork.$_library"
+   _ifs=$IFS
+   IFS=':'
+
+   for _path in $ORK_PATH; do
+      local _filename="$_path/ork.$_library"
+
+      if [ -r "$_filename" ]; then break; fi
+   done
+
+   IFS=$_ifs
 
    if [ ! -r "$_filename" ]; then
       echo "$EXECUTOR: orkhideya: bad include (fatal): $_library ($_filename)" 1>&2
@@ -128,9 +165,9 @@ function ork_include
    fi
 
    # quit cleanly when we run into something we've already sourced
-   if echo "$ORK_INCLUDE_PATH" | grep -q ":$_filename"; then return 0; fi
+   if echo "$ORK_SOURCE_PATH" | grep -q ":$_filename"; then return 0; fi
 
-   ORK_INCLUDE_PATH="$ORK_INCLUDE_PATH:$_filename"
+   ORK_SOURCE_PATH="$ORK_SOURCE_PATH:$_filename"
    source $_filename
 
    if [ "$?" != "0" ]; then
@@ -146,7 +183,6 @@ function ork_include
 ORK_ROOT="/usr/local/lib/orkhideya"
 
 # modify these variables if you care a lot more about where things go
-ORK_INCLUDE="include"
 ORK_ETC="etc"
 ORK_BIN="bin"
 ORK_VAR="var"
@@ -161,11 +197,9 @@ if [ -f "$HOME/.orkhideya" -a -r "$HOME/.orkhideya" ]; then
    source "$HOME/.orkhideya"
 fi
 
-for _path in include etc tmp; do
-   _pathroot="$(ork_pathroot $_path)"
-
-   if [ ! -d "$_pathroot" ]; then
-      echo "$EXECUTOR: orkhideya: bad root for $_path: $_pathroot" 1>&2
-      return 1
-   fi
-done
+# make sure the root path is in the orkhideya path 
+if [ -z "$ORK_PATH" ]; then
+   ORK_PATH="$(ork_pathroot 'path')"
+else
+   ORK_PATH="$ORK_PATH:$(ork_pathroot 'path')"
+fi

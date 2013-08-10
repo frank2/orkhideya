@@ -1,0 +1,71 @@
+#!/bin/bash
+
+source orkhideya
+ork_include if
+ork_include stdlib
+ork_include stdout
+
+function iw_root
+{
+   ork_configpath "iw"
+   return 0
+}
+
+function iw_ap_root
+{
+   ork_pathcat "$(iw_root)" "$ORK_IW_AP_PATH"
+   return 0
+}
+
+function iw_ap_path
+{
+   local _ap="$1"
+   ork_pathcat "$(iw_ap_root)" "$(stdlib_pathify "$_ap")"
+   return 0
+}
+
+function iw_ap_exists
+{
+   local _ap="$1"
+   test -d "$(iw_ap_path "$_ap")"
+   return $?
+}
+
+function iw_ap_essid
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _essid_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "essid")"
+   [ -z "$_essid_file" ] && return 2
+   [ ! -r "$_essid_file" ] && return 3
+
+   cat "$_essid_file"
+   return 0
+}
+
+function iw_ap_bssid
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _bssid_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "bssid")"
+   [ -z "$_bssid_file" ] && return 2
+   [ ! -r "$_bssid_file" ] && return 3
+
+   cat "$_bssid_file"
+   return 0
+}
+
+function iw_ap_connect
+{
+   local _ap="$1"
+   local _device="$2"
+   ! if_dev_is_up "$_device" && ! if_dev_up "$_device" && return 1
+
+   local _bssid="$(iw_ap_bssid "$_ap
+
+ORK_IW_SCAN_RETRY="3"
+ORK_IW_AP_PATH="ap"
+
+ork_reconfigure "iw"

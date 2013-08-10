@@ -9,12 +9,17 @@ function stdlib_trap
 
    if [ "$_status" != "0" ]; then
       stdout_error "Execution failed (status: $_status)"
+      stdout_error "Running clean-up chain."
 
-      if [ -n "$STDLIB_TRAP_FUNCTION" ]; then
-         stdout_error "Running clean-up function $(stdout_color_wrap main-focused "$STDLIB_TRAP_FUNCTION")."
-         $STDLIB_TRAP_FUNCTION
-      fi
+      local _popped="$(stdlib_trap_cleanup_pop)"
 
+      while [ -n "$_popped" ]; do
+         stdout_error "... $(stdout_color_wrap main-focused "$_popped")"
+         $_popped
+         _popped="$(stdlib_trap_cleanup_pop)"
+      done
+
+      stdout_error "Cleanup complete."
       exit 1
    fi
 
@@ -30,7 +35,9 @@ function stdlib_trap_cleanup_push
 
 function stdlib_trap_cleanup_pop
 {
-   STDLIB_TRAP_FUNCTION=""
+   local _function="$(echo "$STDLIB_TRAP_FUNCTIONS" | awk '{ print $1 }')"
+   STDLIB_TRAP_FUNCTIONS="$(echo "$STDLIB_TRAP_FUNCTIONS" | awk '{ $1=""; print $0 }')"
+   echo "$_function"
    return 0
 }
 

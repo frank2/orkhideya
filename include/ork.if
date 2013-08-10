@@ -24,14 +24,14 @@ function if_dev_root
 function if_class_path
 {
    local _class="$1"
-   ork_pathcat "$(if_class_root)" "$_class"
+   ork_pathcat "$(if_class_root)" "$(stdlib_pathify "$_class")"
    return 0
 }
 
 function if_dev_path
 {
    local _dev="$1"
-   ork_pathcat "$(if_dev_root)" "$_dev"
+   ork_pathcat "$(if_dev_root)" "$(stdlib_pathify "$_dev")"
    return 0
 }
 
@@ -49,14 +49,13 @@ function if_dev_exists
    return $?
 }
 
-function if_class_new
+function if_class_create
 {
    local _class="$1"
    local _args="${@:2}"
    ! if_class_exists "$_class" && return 1
 
    local _class_path="$(if_class_path "$_class")"
-
    local _class_create="$_class_path/create"
    [ ! -x "$_class_create" ] && return 2
 
@@ -65,12 +64,57 @@ function if_class_new
 
    if_dev_exists "$_new_device" && return 4
 
-   local _dev_file="$_dev_path/class"
-   stdlib_forcepath "$_dev_file"
+   local _dev_path="$(if_dev_path "$_new_device")"
+   local _dev_class="$_dev_path/class"
+   stdlib_forcepath "$_dev_class"
 
-   echo "$_class" > "$_dev_file"
+   echo "$_class" > "$_dev_class"
    echo "$_new_device"
 
+   return 0
+}
+
+function if_class_destroy
+{
+   local _class="$1"
+   local _device="$2"
+   local _args="${@:3}"
+   ! if_class_exists "$_class" && return 1
+
+   local _class_path="$(if_class_path "$_class")"
+   local _class_destroy="$_class_path/destroy"
+   [ ! -x "$_class_destroy" ] && return 2
+
+   $_class_destroy "$_device" "$_args"
+   [ "$?" != "0" ] && return 3
+
+   local _dev_path="$(if_dev_path "$_device")"
+   proc_silent rm -rf "$_dev_path"
+
+   return 0
+}
+
+function if_dev_class
+{
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _device_class="$(stdlib_filesearch "$(if_dev_root)" "$(stdlib_pathify "$_device")" "class")"
+   ! test -n "$_device_class" -a -r "$_device_class" && return 2
+
+   cat "$_device_path"
+   return 0
+}
+
+function if_dev_interface
+{
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _device_interface="$(stdlib_filesearch "$(if_dev_root)" "$(stdlib_pathify "$_device")" "interface")"
+   ! test -n "$_device_interface" -a -r "$_device_interface" && return 2
+
+   cat "$_device_interface"
    return 0
 }
 
@@ -96,7 +140,7 @@ function if_interface_exists
    return $?
 }
 
-function if_interface_isup
+function if_interface_is_up
 {
    local _interface="$1"
 
@@ -106,10 +150,10 @@ function if_interface_isup
    return $?
 }
 
-function if_interface_isdown
+function if_interface_is_down
 {
    local _interface="$1"
-   ! if_interface_isup "$_interface"
+   ! if_interface_is_up "$_interface"
    return $?
 }
 
@@ -140,12 +184,12 @@ function if_interface_up
    return $?
 }
 
-function if_interface_haslink
+function if_interface_has_link
 {
    local _interface="$1"
    local _carrier="/sys/class/net/$_interface/carrier"
 
-   if ! ( if_interface_exists "$_interface" ); then return 1; fi
+   ! if_interface_exists "$_interface" && return 1
    test -r "$_carrier" -a "$(cat "$_carrier" 2>/dev/null)" == "1"
    return $?
 }
@@ -193,22 +237,57 @@ function if_interface_address_set
 
 function if_interface_link_wait
 {
-   local _device="$1"
+   local _interface="$1"
 
-   if ! if_interface_exists "$_device"; then return 1; fi
-   if ! if_interface_isup "$_device"; then return 2; fi
+   ! if_interface_exists "$_interface" && return 1
+   ! if_interface_is_up "$_interface" && return 2
 
    local _timeout="0"
 
    while [ "$_timeout" -lt "$ORK_IF_LINK_TIMEOUT" ]; do
-      if if_interface_haslink "$_device"; then break; fi
+      if_interface_has_link "$_interface" && break
+
       sleep 1
       _timeout="$(($_timeout+1))"
    done
 
-   if [ "$_timeout" == "$ORK_IF_LINK_TIMEOUT" ]; then
-      return 3
-   fi
+   [ "$_timeout" == "$ORK_IF_LINK_TIMEOUT" ] && return 3
+   return 0
+}
+
+function if_dev_is_up
+{
+   local _device="$1"
+   ! if_device_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   ! [ -z "$_interface" ] && return 2
+   ! if_interface_is_up "$_interface" && return 3
+
+   return 0
+}
+
+function if_dev_is_down
+{
+   local _device="$1"
+   ! if_device_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   ! [ -z "$_interface" ] && return 2
+   ! if_interface_is_down "$_interface" && return 3
+
+   return 0
+}
+
+function if_dev_link_wait
+{
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
+   ! if_dev_is_up "$_device" && return 2
+
+   local _interface="$(if_dev_interface "$_device")"
+   ! [ -z "$_interface" ] && return 3
+   ! if_interface_link_wait "$_interface" && return 4
 
    return 0
 }
