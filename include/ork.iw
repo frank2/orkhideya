@@ -140,7 +140,12 @@ function iw_ap_connect
    ! iw_dev_set_essid "$_device" "$_essid" && return 7
    ! iw_dev_set_bssid "$_device" "$_bssid" && return 8
 
-   if [ -x "$(iw_ap_path
+   ! iw_ap_preup "$_ap" "$_device" && return 9
+   ! if_dev_up "$_device" && return 10
+   ! iw_ap_postup "$_ap" "$_device" && return 11
+
+   return 0
+}
 
 ORK_IW_SCAN_RETRY="5"
 ORK_IW_AP_PATH="ap"
