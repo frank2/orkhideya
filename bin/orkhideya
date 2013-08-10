@@ -34,7 +34,7 @@ function ork_pathroot
          ork_pathcat $ORK_BIN
          ;;
       path)
-         ork_pathcat 'include'
+         ork_pathcat $ORK_INCLUDE
          ;;
       var)
          ork_pathcat $ORK_VAR
@@ -187,6 +187,7 @@ ORK_ETC="etc"
 ORK_BIN="bin"
 ORK_VAR="var"
 ORK_TMP="tmp"
+ORK_INCLUDE="include"
 
 # allow these base variables to be overwritten by the system or user
 if [ -f "/etc/orkhideya" -a -r "/etc/orkhideya" ]; then
