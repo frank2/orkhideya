@@ -160,6 +160,20 @@ function iw_ap_disconnect
    return 0
 }
 
+function iw_dev_get_mode
+{
+   local _dev="$1"
+   ! if_dev_exists "$_dev" && return 1
+   ! if_dev_up "$_dev" && return 2
+
+   local _interface="$(if_dev_interface "$_dev")"
+   [ -z "$_interface" ] && return 3
+   ! if_interface_exists "$_interface" && return 4
+
+   stdlib_tolower "$(iwconfig "$_interface" 2>/dev/null | egrep -i -o 'mode:([a-z]+)' | awk -F ':' '{ print $2 }')"
+   return 0
+}
+
 function iw_dev_set_mode
 {
    local _device="$1"
@@ -172,6 +186,26 @@ function iw_dev_set_mode
    local _mode="$2"
    ! iwconfig "$_interface" mode "$_mode" && return 4
 
+   return 0
+}
+
+function iw_dev_scan
+{
+   local _dev="$1"
+   ! if_dev_exists "$_dev" && return 1
+   ! if_dev_up "$_dev" && return 2
+   [ "$(iw_dev_get_mode "$_dev")" != "managed" ] && return 3 # iwlist needs managed
+
+   local _interface="$(if_dev_interface "$_dev")"
+   [ -z "$_interface" ] && return 4
+   ! if_interface_exists "$_interface" && return 5
+
+   # and now, an ugly-ass sed script
+   iwlist "$_interface" scan | tail -n+2 | \
+      sed -r -e 's/(\s)+/\1/g' -e 's/^\s//g' -e 's/:\s+/:/g' -e 's/;\s+/;/g' | \
+      tr '\n' '|' | sed -r -e 's/Cell [0-9]+ - /\nAP|/g' | tail -n+2
+
+   [ "$?" != "0" ] && return 6
    return 0
 }
 
