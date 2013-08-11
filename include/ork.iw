@@ -31,6 +31,26 @@ function iw_ap_exists
    return $?
 }
 
+function iw_class_root
+{
+   ork_pathcat "$(iw_root)" "$ORK_IW_CLASS_PATH"
+   return 0
+}
+
+function iw_class_path
+{
+   local _class="$1"
+   ork_pathcat "$(iw_class_root)" "$(stdlib_pathify "$_class")"
+   return 0
+}
+
+function iw_class_exists
+{
+   local _class="$1"
+   test -d "$(iw_class_path "$_class")"
+   return $?
+}
+
 function iw_ap_essid
 {
    local _ap="$1"
@@ -57,6 +77,19 @@ function iw_ap_bssid
    return 0
 }
 
+function iw_ap_class
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _class_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "class")"
+   [ -z "$_class_file" ] && return 2
+   [ ! -r "$_class_file" ] && return 3
+
+   cat "$_class_file"
+   return 0
+}
+
 function iw_ap_preup
 {
    local _ap="$1"
@@ -65,11 +98,15 @@ function iw_ap_preup
    local _device="$2"
    ! if_dev_exists "$_device" && return 2
 
-   local _preup_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "pre-up")"
-   [ ! -e "$_preup_file" ] && return 0 # if it doesn't exist, that's okay
-   [ ! -x "$_preup_file" ] && return 3 # if it's not exeutable, that ain't cool man!
+   local _class="$(iw_ap_class "$_ap")"
+   [ -z "$_class" ] && return 3
+   ! iw_class_exists "$_class" && return 4
 
-   ! "$_preup_file" "$_device" && return 4
+   local _preup_file="$(stdlib_filesearch "$(iw_class_root)" "$(stdlib_pathify "$_class")" "pre-up")"
+   [ ! -e "$_preup_file" ] && return 0 # if it doesn't exist, that's okay
+   [ ! -x "$_preup_file" ] && return 5 # if it's not exeutable, that ain't cool man!
+
+   ! "$_preup_file" "$_ap" "$_device" && return 6
    return 0
 }
 
@@ -81,11 +118,15 @@ function iw_ap_postup
    local _device="$2"
    ! if_dev_exists "$_device" && return 2
 
-   local _postup_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "post-up")"
-   [ ! -e "$_postup_file" ] && return 0 # if it doesn't exist, that's okay
-   [ ! -x "$_postup_file" ] && return 3 # if it's not exeutable, that ain't cool man!
+   local _class="$(iw_ap_class "$_ap")"
+   [ -z "$_class" ] && return 3
+   ! iw_class_exists "$_class" && return 4
 
-   ! "$_postup_file" "$_device" && return 4
+   local _postup_file="$(stdlib_filesearch "$(iw_class_root)" "$(stdlib_pathify "$_class")" "post-up")"
+   [ ! -e "$_postup_file" ] && return 0 # if it doesn't exist, that's okay
+   [ ! -x "$_postup_file" ] && return 5 # if it's not exeutable, that ain't cool man!
+
+   ! "$_postup_file" "$_ap" "$_device" && return 6
    return 0
 }
 
@@ -97,11 +138,15 @@ function iw_ap_predown
    local _device="$2"
    ! if_dev_exists "$_device" && return 2
 
-   local _predown_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "pre-down")"
-   [ ! -e "$_predown_file" ] && return 0 # if it doesn't exist, that's okay
-   [ ! -x "$_predown_file" ] && return 3 # if it's not exeutable, that ain't cool man!
+   local _class="$(iw_ap_class "$_ap")"
+   [ -z "$_class" ] && return 3
+   ! iw_class_exists "$_class" && return 4
 
-   ! "$_predown_file" "$_device" && return 4
+   local _predown_file="$(stdlib_filesearch "$(iw_class_root)" "$(stdlib_pathify "$_class")" "pre-down")"
+   [ ! -e "$_predown_file" ] && return 0 # if it doesn't exist, that's okay
+   [ ! -x "$_predown_file" ] && return 5 # if it's not exeutable, that ain't cool man!
+
+   ! "$_predown_file" "$_ap" "$_device" && return 6
    return 0
 }
 
@@ -113,11 +158,15 @@ function iw_ap_postdown
    local _device="$2"
    ! if_dev_exists "$_device" && return 2
 
-   local _postdown_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "post-down")"
-   [ ! -e "$_postdown_file" ] && return 0 # if it doesn't exist, that's okay
-   [ ! -x "$_postdown_file" ] && return 3 # if it's not exeutable, that ain't cool man!
+   local _class="$(iw_ap_class "$_ap")"
+   [ -z "$_class" ] && return 3
+   ! iw_class_exists "$_class" && return 4
 
-   ! "$_postdown_file" "$_device" && return 4
+   local _postdown_file="$(stdlib_filesearch "$(iw_class_root)" "$(stdlib_pathify "$_class")" "post-down")"
+   [ ! -e "$_postdown_file" ] && return 0 # if it doesn't exist, that's okay
+   [ ! -x "$_postdown_file" ] && return 5 # if it's not exeutable, that ain't cool man!
+
+   ! "$_postdown_file" "$_ap" "$_device" && return 6
    return 0
 }
 
@@ -189,6 +238,40 @@ function iw_dev_set_mode
    return 0
 }
 
+function iw_scan_attr
+{
+   local _scan="$1"
+   local _attr="$2"
+
+   echo "$_scan" | egrep -o "\\|$_attr#([^|]+)" | cut -d '#' -f 2-
+   return $?
+}
+
+function iw_scan_signal
+{
+   local _scan="$1"
+
+   echo "$_scan" | grep -o -P '\|Quality=\d+/\d+' | awk -F '=' '{ print $2 }'
+   return 0
+}
+
+function iw_scan_encryption
+{
+   local _scan_entry="$1"
+   local _encryption="none"
+
+   if [ -n "$(echo $_scan_entry | grep 'WPA2 Version 1')" ]; then
+      _encryption="WPA2"
+   elif [ -n "$(echo $_scan_entry | grep 'WPA Version 1')" ]; then
+      _encryption="WPA"
+   elif [ -n "$(echo $_scan_entry | grep 'Encryption key#on')" ]; then
+      _encryption="WEP"
+   fi
+
+   echo "$_encryption"
+   return 0
+}
+
 function iw_dev_scan
 {
    local _dev="$1"
@@ -202,7 +285,7 @@ function iw_dev_scan
 
    # and now, an ugly-ass sed script
    iwlist "$_interface" scan | tail -n+2 | \
-      sed -r -e 's/(\s)+/\1/g' -e 's/^\s//g' -e 's/:\s+/:/g' -e 's/;\s+/;/g' -e 's/:/##/' | \
+      sed -r -e 's/(\s)+/\1/g' -e 's/^\s//g' -e 's/:\s+/:/g' -e 's/;\s+/;/g' -e 's/:/#/' | \
       tr '\n' '|' | sed -r -e 's/Cell [0-9]+ - /\nAP|/g' | tail -n+2
 
    [ "$?" != "0" ] && return 6
@@ -212,17 +295,20 @@ function iw_dev_scan
 function iw_dev_scan_simple
 { 
    local _dev="$1"
+   ! if_dev_exists "$_dev" && return 1
+   ! if_dev_up "$_dev" && return 2
+   [ "$(iw_dev_get_mode "$_dev")" != "managed" ] && return 3 # iwlist needs managed
 
    _ifs=$IFS
    IFS="
 "
 
    for _scan_entry in $(iw_dev_scan "$_dev"); do
-      [ "$?" != "0" ] && return 1
+      [ "$?" != "0" ] && return 4
 
-      local _bssid="$(echo $_scan_entry | egrep -i -o 'address##([^|]+)' | awk -F '>>' '{ print $2 }')"
-      local _essid="$(echo $_scan_entry | egrep -i -o 'essid##([^|]+)' | awk -F '>>' '{ print $2 }')"
-      local _quality="$(echo $_scan_entry | grep -i -P -o 'quality=\d+/\d+' | awk -F '=' '{ print $2 }')"
+      local _bssid="$(iw_scan_attr "$_scan_entry" "Address")"
+      local _essid="$(iw_scan_attr "$_scan_entry" "ESSID")"
+      #local _quality="$(echo $_scan_entry | grep -i -P -o 'quality=\d+/\d+' | awk -F '=' '{ print $2 }')"
 
       local _encryption="none"
 
@@ -230,12 +316,11 @@ function iw_dev_scan_simple
          _encryption="WPA2"
       elif [ -n "$(echo $_scan_entry | grep 'WPA Version 1')" ]; then
          _encryption="WPA"
-      elif [ -n "$(echo $_scan_entry | grep 'Encryption key##on')" ]; then
+      elif [ -n "$(echo $_scan_entry | grep 'Encryption key#on')" ]; then
          _encryption="WEP"
       fi
 
-      echo "AP|BSSID##$_bssid|ESSID##$_essid|Quality##$_quality|Encryption##$_encryption"
-      
+      echo "AP|BSSID#$_bssid|ESSID#$_essid|Encryption#$_encryption"
    done
 
    return 0
@@ -286,7 +371,7 @@ function iw_dev_set_bssid
    return 0
 }
 
-ORK_IW_SCAN_RETRY="5"
 ORK_IW_AP_PATH="ap"
+ORK_IW_CLASS_PATH="class"
 
 ork_reconfigure "iw"
