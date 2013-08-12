@@ -163,3 +163,23 @@ function stdlib_filesearch
    if [ -e "$_found_file" ]; then echo "$_found_file"; return 0; fi
    return 1
 }
+
+function stdlib_strip_quotes
+{
+   local _quoted="$@"
+
+   echo "$_quoted" | sed "s/^\([\"']\)\(.*\)\1\$/\2/g" 
+   return 0
+}
+
+function stdlib_tmpfile
+{
+   local _label="$@"
+
+   if [ -z "$_label" ]; then
+      _label="$(echo `date` $RANDOM | sha1sum - | awk '{ print $1 }')"
+   fi
+
+   echo "$(ork_pathroot "tmp")/$_label"
+   return 0
+}

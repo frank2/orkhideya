@@ -100,7 +100,7 @@ function if_dev_class
    local _device_class="$(stdlib_filesearch "$(if_dev_root)" "$(stdlib_pathify "$_device")" "class")"
    ! test -n "$_device_class" -a -r "$_device_class" && return 2
 
-   cat "$_device_path"
+   cat "$_device_class"
    return 0
 }
 
@@ -219,6 +219,25 @@ function if_interface_address_set
    return 0
 }
 
+function if_interface_ether_get
+{
+   local _interface="$1"
+   ! if_interface_exists "$_interface" && return 1
+
+   cat "/sys/class/net/$_interface/address"
+   return 0
+}
+
+function if_interface_ether_set
+{
+   local _interface="$1"
+   local _address="$2"
+   ! if_interface_exists "$_interface" && return 1
+   ! ifconfig "$_interface" hw ether "$_address" && return 2
+
+   return 0
+}
+
 function if_interface_link_wait
 {
    local _interface="$1"
@@ -325,7 +344,10 @@ function if_dev_preup
    local _device="$1"
    ! if_dev_exists "$_device" && return 1
 
-   local _preup_file="$(stdlib_filesearch "$(if_dev_root)" "$(stdlib_pathify "$_device")" "pre-up")"
+   local _class="$(if_dev_class "$_device")"
+   ! if_class_exists "$_class" && return 2
+
+   local _preup_file="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "pre-up")"
    [ -z "$_preup_file" -o ! -e "$_preup_file" ] && return 0 # if it doesn't exist, that's okay
    [ ! -x "$_preup_file" ] && return 3 # if it's not exeutable, that ain't cool man!
 
@@ -335,13 +357,13 @@ function if_dev_preup
 
 function if_dev_postup
 {
-   local _ap="$1"
-   ! if_dev_exists "$_ap" && return 1
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
 
-   local _device="$2"
-   ! if_dev_exists "$_device" && return 2
+   local _class="$(if_dev_class "$_device")"
+   ! if_class_exists "$_class" && return 2
 
-   local _postup_file="$(stdlib_filesearch "$(if_dev_root)" "$(stdlib_pathify "$_ap")" "post-up")"
+   local _postup_file="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "post-up")"
    [ -z "$_postup_file" -o ! -e "$_postup_file" ] && return 0 # if it doesn't exist, that's okay
    [ ! -x "$_postup_file" ] && return 3 # if it's not exeutable, that ain't cool man!
 
@@ -351,13 +373,13 @@ function if_dev_postup
 
 function if_dev_predown
 {
-   local _ap="$1"
-   ! if_dev_exists "$_ap" && return 1
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
 
-   local _device="$2"
-   ! if_dev_exists "$_device" && return 2
+   local _class="$(if_dev_class "$_device")"
+   ! if_class_exists "$_class" && return 2
 
-   local _predown_file="$(stdlib_filesearch "$(if_dev_root)" "$(stdlib_pathify "$_ap")" "pre-down")"
+   local _predown_file="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "pre-down")"
    [ -z "$_predown_file" -o ! -e "$_predown_file" ] && return 0 # if it doesn't exist, that's okay
    [ ! -x "$_predown_file" ] && return 3 # if it's not exeutable, that ain't cool man!
 
@@ -367,17 +389,41 @@ function if_dev_predown
 
 function if_dev_postdown
 {
-   local _ap="$1"
-   ! if_dev_exists "$_ap" && return 1
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
 
-   local _device="$2"
-   ! if_dev_exists "$_device" && return 2
+   local _class="$(if_dev_class "$_device")"
+   ! if_class_exists "$_class" && return 2
 
-   local _postdown_file="$(stdlib_filesearch "$(if_dev_root)" "$(stdlib_pathify "$_ap")" "post-down")"
+   local _postdown_file="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "post-down")"
    [ -z "$_postdown_file" -o ! -e "$_postdown_file" ] && return 0 # if it doesn't exist, that's okay
    [ ! -x "$_postdown_file" ] && return 3 # if it's not exeutable, that ain't cool man!
 
    ! "$_postdown_file" "$_device" && return 4
+   return 0
+}
+
+function if_dev_ether_get
+{
+   local _devive="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   ! if_interface_exists "$_interface" && return 2
+   ! if_interface_ether_get "$_interface" && return 3
+   return 0
+}
+
+function if_dev_ether_set
+{
+   local _devive="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   ! if_interface_exists "$_interface" && return 2
+
+   local _address="$2"
+   ! if_interface_ether_set "$_interface" "$_address" && return 3
    return 0
 }
 
