@@ -219,6 +219,12 @@ function if_interface_address_set
    return 0
 }
 
+function if_interface_network_ipv4
+{
+   local _interface="$1"
+   ! if_interface_exists "$_interface" && return 1
+}
+
 function if_interface_ether_get
 {
    local _interface="$1"
