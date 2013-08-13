@@ -90,6 +90,32 @@ function iw_ap_class
    return 0
 }
 
+function iw_ap_key
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _key_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "key")"
+   [ -z "$_key_file" ] && return 2
+   [ ! -r "$_key_file" ] && return 3
+
+   cat "$_key_file"
+   return 0
+}
+
+function iw_ap_config
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _config_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "config")"
+   [ -z "$_config_file" ] && return 2
+   [ ! -r "$_config_file" ] && return 3
+
+   cat "$_config_file"
+   return 0
+}
+
 function iw_ap_preup
 {
    local _ap="$1"
@@ -207,6 +233,12 @@ function iw_ap_disconnect
    ! iw_ap_postdown "$_ap" "$_device" && return 5
 
    return 0
+}
+
+function iw_ap_list
+{
+   find "$(iw_ap_root)" -name "bssid" -exec cat {} \;
+   return $?
 }
 
 function iw_dev_get_mode
@@ -367,6 +399,21 @@ function iw_dev_set_bssid
 
    local _bssid="$2"
    ! iwconfig "$_interface" ap "$_bssid" && return 4
+
+   return 0
+}
+
+function iw_dev_set_key
+{
+   local _device="$1"
+   ! if_dev_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   [ -z "$_interface" ] && return 2
+   ! if_interface_exists "$_interface" && return 3
+
+   local _key="$2"
+   ! iwconfig "$_interface" key "$_key" && return 4
 
    return 0
 }

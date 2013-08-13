@@ -39,8 +39,12 @@ function proc_kill
    _pid="$1"
    ! proc_is_running "$_pid" && return 1
 
-   proc_silent kill -9 "$_pid"
-   if [ "$?" != "0" ]; then return 2; fi
+   while proc_is_running "$_pid"; do
+      proc_silent kill -9 "$_pid"
+      if ! proc_is_running "$_pid"; then break; fi
+      sleep 1
+   done
+
    return 0
 }
 
@@ -154,12 +158,12 @@ function proc_label_spawn
 
    stdout_warning "Executing: $(stdout_color_wrap main-focused "$_commandline")"
 
-   $_commandline &>/dev/null & 
+   $_commandline & 
+   local _new_pid="$!"
    sleep 1
 
-   _resulting_pid="$(ps kstart_time ax | sort -r | grep "$_commandline" | grep -v grep | head -n1 | awk '{ print $1 }')"
-
-   if [ -z "$_resulting_pid" ]; then 
+   local _resulting_pid="$(ps kstart_time ax | sort -r | grep "$(echo $_commandline | awk '{ print $1 }')" | grep -v grep | head -n1 | awk '{ print $1 }')"
+   if [ -z "$_resulting_pid" -o "$_resulting_pid" -lt "$_new_pid" ]; then 
       stdout_error "Fork failure."
 
       proc_silent rm -rf "$(stdlib_cdup $_pidpath)" 
@@ -178,7 +182,10 @@ function proc_label_kill
 
    local _procpath="$(proc_label_path "$_label")"
    local _pid="$(proc_label_pid "$_label")"
-   [ -z "$_pid" ] && return 2
+   if [ -z "$_pid" ]; then # this pid went poof I guess
+      proc_silent rm -rf "$_procpath"
+      return 0
+   fi
 
    if [ -r "$_procpath/template" ]; then
       local _template="$(cat "$_procpath/template")"
