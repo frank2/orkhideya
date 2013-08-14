@@ -158,7 +158,7 @@ function proc_label_spawn
 
    stdout_warning "Executing: $(stdout_color_wrap main-focused "$_commandline")"
 
-   $_commandline & 
+   $_commandline &>/dev/null &
    local _new_pid="$!"
    sleep 1
 

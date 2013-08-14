@@ -26,8 +26,8 @@ function fw_rule_exists
 
 function fw_rule_apply
 {
-   local _rule="$1"
-   local _device="$2"
+   local _device="$1"
+   local _rule="$2"
    local _args="${@:3}" 
    ! if_dev_exists "$_device" && return 1
 

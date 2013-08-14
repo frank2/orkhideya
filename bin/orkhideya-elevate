@@ -1,0 +1,7 @@
+#!/bin/bash
+
+source orkhideya-root
+ork_include -
+
+$@
+exit $?
