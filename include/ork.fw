@@ -68,5 +68,97 @@ function fw_append
    return 0
 }
 
+function fw_append_d
+{
+   ! fw_append D $@ && return 1
+   return 0
+}
+
+function fw_append_4
+{
+   ! fw_append 4 $@ && return 1
+   return 0
+}
+
+function fw_append_6
+{
+   ! fw_append 6 $@ && return 1
+   return 0
+}
+
+function fw_check
+{ 
+   local _protocol="$1"
+   local _chain="$(strlib_toupper $2)"
+   local _args="${@:3}"
+
+   fw_raw "$_protocol" -C "$_chain" $_args
+   return $?
+}
+
+function fw_check_d
+{
+   fw_check D $@
+   return $?
+}
+
+function fw_check_4
+{
+   fw_check 4 $@
+   return $?
+}
+
+function fw_check_6
+{
+   fw_check 6
+   return $?
+}
+
+function fw_delete
+{ 
+   local _protocol="$1"
+   local _chain="$(strlib_toupper $2)"
+   local _args="${@:3}"
+
+   ! fw_raw "$_protocol" -D "$_chain" $_args && return 1
+   return 0
+}
+
+function fw_delete_d
+{
+   ! fw_delete D $@ && return 1
+   return 0
+}
+
+function fw_delete_4
+{
+   ! fw_delete 4 $@ && return 1
+   return 0
+}
+
+function fw_delete_6
+{
+   ! fw_delete 6 $@ && return 1
+   return 0
+}
+
+function fw_clear_interface
+{
+   local _protocol="$1"
+   local _chain="$2"
+   local _interface="$3"
+   ! if_interface_exists "$_interface" && return 1
+
+   local _ifs=$IFS
+   IFS="
+"
+   
+   for _rule in $(iptables -S "$_chain"); do
+      if [ "$?" != "0" ]; then return 2; fi
+   done
+
+   return 0
+}
+
 ORK_FW_RULES="rules"
 ork_reconfigure "fw"
