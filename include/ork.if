@@ -210,11 +210,12 @@ function if_interface_address_set
    local _interface="$1"
    local _family="$2"
    local _address="$3"
+   local _args=${@:4}
 
    if ! if_interface_address_canacquire "$_family"; then return 1; fi
    if ! if_interface_exists "$_interface"; then return 2; fi
 
-   ifconfig "$_interface" "$_family" "$_address"
+   ifconfig "$_interface" "$_family" "$_address" $_args
    if [ "$?" != "0" ]; then return 3; fi
    return 0
 }
@@ -321,6 +322,7 @@ function if_dev_up
 {
    local _device="$1"
    ! if_dev_exists "$_device" && return 1
+   if_dev_is_up "$_device" && return 0
 
    local _interface="$(if_dev_interface "$_device")"
    ! if_interface_exists "$_interface" && return 2
@@ -335,6 +337,7 @@ function if_dev_down
 {
    local _device="$1"
    ! if_dev_exists "$_device" && return 1
+   if_dev_is_down "$_device" && return 0
 
    local _interface="$(if_dev_interface "$_device")"
    ! if_interface_exists "$_interface" && return 2

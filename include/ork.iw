@@ -237,7 +237,10 @@ function iw_ap_disconnect
 
 function iw_ap_list
 {
-   find "$(iw_ap_root)" -name "bssid" -exec cat {} \;
+   _category="$1"
+   [ -n "$_category" ] && ! iw_ap_exists "$_category" && exit 1;
+
+   find "$(ork_pathcat "$(iw_ap_root)" "$(stdlib_pathify "$_category")")" -name "bssid" -exec cat {} \;
    return $?
 }
 
@@ -331,7 +334,7 @@ function iw_dev_scan_simple
    ! if_dev_up "$_dev" && return 2
    [ "$(iw_dev_get_mode "$_dev")" != "managed" ] && return 3 # iwlist needs managed
 
-   _ifs=$IFS
+   _ifs="$IFS"
    IFS="
 "
 
@@ -354,6 +357,8 @@ function iw_dev_scan_simple
 
       echo "AP|BSSID#$_bssid|ESSID#$_essid|Encryption#$_encryption"
    done
+
+   IFS="$_ifs"
 
    return 0
 }

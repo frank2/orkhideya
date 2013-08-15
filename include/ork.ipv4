@@ -22,16 +22,58 @@ function ipv4_valid
    return $?
 }
 
-function ipv4_valid_cidr
+function ipv4_cidr_valid
 {
-   local _address="$1"
-   if ! ( echo "$_address" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_address")" -gt 1 ]; then return 1; fi
+   local _cidr="$1"
+   if ! ( echo "$_cidr" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_cidr")" -gt 1 ]; then return 1; fi
 
-   local _network="$(echo "$_address" | awk -F '/' '{ print $2 }')"
-   if ! ( echo $_network | grep -q '^[0-9]+$' ); then return 2; fi
+   _address="$(echo "$_cidr" | awk -F '/' '{ print $1 }')"
+   _network="$(echo "$_cidr" | awk -F '/' '{ print $2 }')"
+   [ -z "$(echo $_network | egrep -o '^[0-9]+$')" ] && return 2
 
-   ipv4_valid "$_address" && [ "$_network" -ge "0" -a "$_network" -le "32" ];
+   ipv4_valid "$_address" && [ "$_network" -ge "0" -a "$_network" -le "32" ]
    return $?
+}
+
+function ipv4_cidr_network
+{
+   local _cidr="$1"
+   ! ipv4_cidr_valid "$_cidr" && return 1
+
+   echo "$_cidr" | awk -F '/' '{ print $1 }'
+   return 0
+}
+
+function ipv4_cidr_mask
+{
+   local _cidr="$1"
+   ! ipv4_cidr_valid "$_cidr" && return 1
+
+   echo "$_cidr" | awk -F '/' '{ print $2 }'
+   return 0
+}
+
+function ipv4_cidr_netmask
+{
+   local _cidr="$1"
+   ! ipv4_cidr_valid "$_cidr" && return 1
+
+   ipv4_from_int "$(ipv4_mask "$(ipv4_cidr_mask "$_cidr")")"
+}
+
+function ipv4_cidr_broadcast
+{
+   local _cidr="$1"
+   ! ipv4_cidr_valid "$_cidr" && return 1
+
+   local _netmask="$(ipv4_to_int "$(ipv4_cidr_netmask "$_cidr")")"
+   _netmask="$(($_netmask ^ 0xFFFFFFFF))"
+
+   local _network="$(ipv4_to_int "$(ipv4_cidr_network "$_cidr")")"
+   local _broadcast="$(ipv4_from_int $(($_network | $_netmask)))"
+
+   echo "$_broadcast"
+   return 0
 }
 
 function ipv4_to_int
@@ -73,5 +115,14 @@ function ipv4_from_int
    done
 
    echo "$_address"
+   return 0
+}
+
+function ipv4_cidr_enum
+{
+   local _cidr="$1"
+   ! ipv4_cidr_valid "$_cidr" && return 1
+
+   nmap -sL -n "$_cidr" | grep -o -P '\d+\.\d+\.\d+\.\d+' | tail -n+2 | head -n-1
    return 0
 }
