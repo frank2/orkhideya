@@ -57,6 +57,7 @@ function proc_timed_kill
    return $?
 }
 
+# I can probably get rid of templates??? they seem redundant as hell
 function proc_template_exists
 {
    local _template="$1"
@@ -121,7 +122,54 @@ function proc_label_exists
    return $?
 }
 
-function proc_label_pid
+function proc_label_pid_file
+{
+   local _label="$1"
+   local _procpath="$(proc_label_path "$_label")"
+
+   ork_pathcat "$_procpath" "pid"
+   return 0
+}
+
+function proc_label_stdout_file
+{
+   local _label="$1"
+   local _procpath="$(proc_label_path "$_label")"
+
+   ork_pathcat "$_procpath" "stdout"
+   return 0
+}
+
+function proc_label_stderr_file
+{
+   local _label="$1"
+   local _procpath="$(proc_label_path "$_label")"
+
+   ork_pathcat "$_procpath" "stderr"
+   return 0
+}
+
+function proc_label_get_stdout
+{
+   local _label="$1"
+   local _stdout_file="$(proc_label_stdout_file "$_label")"
+
+   ! test -r "$_stdout_file" && return 1
+   cat "$_stdout_file"
+   return 0
+}
+
+function proc_label_get_stderr
+{
+   local _label="$1"
+   local _stderr_file="$(proc_label_stderr_file "$_label")"
+
+   ! test -r "$_stderr_file" && return 1
+   cat "$_stderr_file"
+   return 0
+}
+
+function proc_label_get_pid
 {
    local _label="$1"
    ! proc_label_exists "$_label" && return 1
@@ -140,7 +188,7 @@ function proc_label_is_running
    local _label="$1"
 
    ! proc_label_exists "$_label" && return 1
-   ! proc_is_running "$(proc_label_pid "$_label")" && return 2
+   ! proc_is_running "$(proc_label_get_pid "$_label")" && return 2
    return 0
 }
 
@@ -150,13 +198,13 @@ function proc_label_spawn
    local _commandline="${@:2}"
    [ -z "$_label" ] && return 1
 
-   local _pidpath="$(proc_pid_root)/$_label"
+   local _pidpath="$(proc_label_path "$_label")"
    [ -z "$_pidpath" ] && return 2
-   [ -d "$_pidpath" ] && return 3 # pid by this label exists already
+   [ -e "$(proc_label_pid_file "$_label")" ] && return 3 # pid by this label exists already
 
-   local _pidfile="$(stdlib_forcepath "$_pidpath/pid")"
-   local _stdoutfile="$(stdlib_forcepath "$_pidpath/stdout")"
-   local _stderrfile="$(stdlib_forcepath "$_pidpath/stderr")"
+   local _pidfile="$(stdlib_forcepath "$(proc_label_pid_file "$_label")")"
+   local _stdoutfile="$(stdlib_forcepath "$(proc_label_stdout_file "$_label")")"
+   local _stderrfile="$(stdlib_forcepath "$(proc_label_stderr_file "$_label")")"
 
    stdout_warning "Executing: $(stdout_color_wrap main-focused "$_commandline")"
 
@@ -168,13 +216,21 @@ function proc_label_spawn
    if [ -z "$_resulting_pid" -o "$_resulting_pid" -lt "$_new_pid" ]; then 
       stdout_error "Fork failure."
 
-      proc_silent rm -rf "$(stdlib_cdup $_pidpath)" 
+      proc_silent rm -rf "$_pidpath" 
       return 4
    fi
 
    echo "$_resulting_pid" > "$_pidfile"
    return 0
 }
+
+function proc_label_spawn_silent
+{
+   local _label="$1"
+   local _commandline="${@:2}"
+
+   local _stdoutfile="$(stdlib_forcepath "$(proc_label_stdout_file)")"
+   local _stderrfile="$(stdlib_forcepath "$(proc_label_stderr_file)")"
 
 function proc_label_kill
 {
@@ -183,7 +239,7 @@ function proc_label_kill
    ! proc_label_exists "$_label" && return 1
 
    local _procpath="$(proc_label_path "$_label")"
-   local _pid="$(proc_label_pid "$_label")"
+   local _pid="$(proc_label_get_pid "$_label")"
    if [ -z "$_pid" ]; then # this pid went poof I guess
       proc_silent rm -rf "$_procpath"
       return 0
@@ -197,7 +253,7 @@ function proc_label_kill
    fi
 
    if proc_label_is_running "$_label"; then
-      local _pid="$(proc_label_pid "$_label")"
+      local _pid="$(proc_label_get_pid "$_label")"
       [ -n "$_pid" ] && proc_silent kill -9 "$_pid"
    fi 
 
