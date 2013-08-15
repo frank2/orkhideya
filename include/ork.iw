@@ -103,14 +103,21 @@ function iw_ap_key
    return 0
 }
 
-function iw_ap_config
+function iw_ap_config_file
 {
    local _ap="$1"
    ! iw_ap_exists "$_ap" && return 1
 
-   local _config_file="$(stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "config")"
-   [ -z "$_config_file" ] && return 2
-   [ ! -r "$_config_file" ] && return 3
+   stdlib_filesearch "$(iw_ap_root)" "$(stdlib_pathify "$_ap")" "config"
+   return 0
+}
+
+function iw_ap_config
+{
+   local _ap="$1"
+   local _config_file="$(iw_ap_config_file "$_ap")"
+   [ -z "$_config_file" ] && return 1
+   [ ! -r "$_config_file" ] && return 2
 
    cat "$_config_file"
    return 0

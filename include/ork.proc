@@ -15,12 +15,6 @@ function proc_pid_root
    return 0
 }
 
-function proc_template_root
-{
-   ork_pathcat "$(proc_root)" "$ORK_PROC_TEMPLATE_PATH"
-   return 0
-}
-
 function proc_silent
 {
    "$@" &>/dev/null
@@ -54,56 +48,6 @@ function proc_timed_kill
    _timeout="$2"
 
    sleep $_timeout && proc_kill "$_pid"
-   return $?
-}
-
-# I can probably get rid of templates??? they seem redundant as hell
-function proc_template_exists
-{
-   local _template="$1"
-   test -e "$(proc_template_root)/$(stdlib_pathify "$_template")"
-   return $?
-}
-
-function proc_template_command
-{
-   local _template="$1"
-   local _args="${@:2}"
-
-   ! proc_template_exists "$_template" && return 1
-   local _file="$(stdlib_filesearch "$(proc_template_root)" "$(stdlib_pathify "$_template")" "$ORK_PROC_TEMPLATE_RUN_FILE")"
-
-   if [ ! -x "$_file" ]; then return 2; fi
-
-   local _commandline="$("$_file" $_args)"
-   if [ -z "$_commandline" ]; then return 3; fi
-
-   echo "$_commandline"
-   return 0
-}
-
-function proc_template_kill
-{
-   local _template="$1"
-   local _pid="$2"
-   local _args="${@:3}"
-
-   ! proc_template_exists "$_template" && return 1
-   local _file="$(stdlib_filesearch "$(proc_template_root)" "$(stdlib_pathify "$_template")" "$ORK_PROC_TEMPLATE_KILL_FILE")"
-
-   if [ ! -x "$_file" ]; then return 1; fi
-
-   "$_file" "$_pid" $_args
-   if [ "$?" != "0" ]; then return 2; fi
-   return 0
-}
-
-function proc_template_has_arg
-{
-   local _arg="$1"
-   local _args="${@:2}"
-
-   echo "$_args" | grep -E -q "([[:space:]]+$_arg[[:space:]]+|[[:space:]]+$_arg\$|^$_arg[[:space:]]+|^$_arg\$)"
    return $?
 }
 
@@ -229,8 +173,14 @@ function proc_label_spawn_silent
    local _label="$1"
    local _commandline="${@:2}"
 
-   local _stdoutfile="$(stdlib_forcepath "$(proc_label_stdout_file)")"
-   local _stderrfile="$(stdlib_forcepath "$(proc_label_stderr_file)")"
+   local _stdoutfile="$(stdlib_forcepath "$(proc_label_stdout_file "$_label")")"
+   local _stderrfile="$(stdlib_forcepath "$(proc_label_stderr_file "$_label")")"
+
+   ! ln -s "/dev/null" "$_stdoutfile" && return -1
+   ! ln -s "/dev/null" "$_stderrfile" && return -2
+   proc_label_spawn "$_label" $_commandline
+   return $?
+}
 
 function proc_label_kill
 {
@@ -245,13 +195,6 @@ function proc_label_kill
       return 0
    fi
 
-   if [ -r "$_procpath/template" ]; then
-      local _template="$(cat "$_procpath/template")"
-
-      ! proc_template_exists && return 3
-      ! proc_template_kill "$_template" "$_pid" $_args && return 4
-   fi
-
    if proc_label_is_running "$_label"; then
       local _pid="$(proc_label_get_pid "$_label")"
       [ -n "$_pid" ] && proc_silent kill -9 "$_pid"
@@ -261,25 +204,4 @@ function proc_label_kill
    return 0
 }
 
-function proc_label_template_exec
-{
-   local _label="$1"
-   local _template="$2"
-   local _args="${@:3}"
-
-   _commandline="$(proc_template_command "$_template" $_args)"
-   [ -z "$_commandline" ] && return 1
-
-   proc_label_spawn "$_label" "$_commandline"
-   [ "$?" != "0" ] && return 2
-
-   local _template_file="$(stdlib_forcepath "$(proc_label_path "$_label")/template")"
-   echo $_template > "$_template_file"
-
-   return 0
-}
-
 ORK_PROC_PID_PATH="pid"
-ORK_PROC_TEMPLATE_PATH="templates"
-ORK_PROC_TEMPLATE_RUN_FILE="run"
-ORK_PROC_TEMPLATE_KILL_FILE="kill"
