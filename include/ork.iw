@@ -248,11 +248,10 @@ function iw_dev_get_mode
 {
    local _dev="$1"
    ! if_dev_exists "$_dev" && return 1
-   ! if_dev_up "$_dev" && return 2
 
    local _interface="$(if_dev_interface "$_dev")"
-   [ -z "$_interface" ] && return 3
-   ! if_interface_exists "$_interface" && return 4
+   [ -z "$_interface" ] && return 2
+   ! if_interface_exists "$_interface" && return 3
 
    stdlib_tolower "$(iwconfig "$_interface" 2>/dev/null | egrep -i -o 'mode:([a-z]+)' | awk -F ':' '{ print $2 }')"
    return 0

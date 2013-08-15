@@ -155,10 +155,12 @@ function proc_label_spawn
    [ -d "$_pidpath" ] && return 3 # pid by this label exists already
 
    local _pidfile="$(stdlib_forcepath "$_pidpath/pid")"
+   local _stdoutfile="$(stdlib_forcepath "$_pidpath/stdout")"
+   local _stderrfile="$(stdlib_forcepath "$_pidpath/stderr")"
 
    stdout_warning "Executing: $(stdout_color_wrap main-focused "$_commandline")"
 
-   $_commandline &>/dev/null &
+   $_commandline 1>"$_stdoutfile" 2>"$_stderrfile" &
    local _new_pid="$!"
    sleep 1
 
