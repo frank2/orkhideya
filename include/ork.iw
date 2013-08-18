@@ -301,9 +301,9 @@ function iw_scan_encryption
    local _scan_entry="$1"
    local _encryption="none"
 
-   if [ -n "$(echo $_scan_entry | grep 'WPA2 Version 1')" ]; then
+   if [ -n "$(echo $_scan_entry | grep 'WPA2 Version')" ]; then
       _encryption="wpa2"
-   elif [ -n "$(echo $_scan_entry | grep 'WPA Version 1')" ]; then
+   elif [ -n "$(echo $_scan_entry | grep 'WPA Version')" ]; then
       _encryption="wpa"
    elif [ -n "$(echo $_scan_entry | grep 'Encryption key#on')" ]; then
       _encryption="wep"

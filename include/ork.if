@@ -2,6 +2,7 @@
 
 source orkhideya
 ork_include stdlib
+ork_include ipv4
 
 function if_root
 {
@@ -58,36 +59,25 @@ function if_class_create
    local _class_create="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "create")"
    [ ! -x "$_class_create" ] && return 2
 
-   local _new_device="$($_class_create "$_args")"
+   local _new_interface="$($_class_create "$_args")"
    if [ "$?" != "0" ]; then return 3; fi
 
-   if_dev_exists "$_new_device" && return 4
-
-   local _dev_path="$(if_dev_path "$_new_device")"
-   local _dev_class="$_dev_path/class"
-   stdlib_forcepath "$_dev_class"
-
-   echo "$_class" > "$_dev_class"
-   echo "$_new_device"
-
+   echo "$_new_interface"
    return 0
 }
 
 function if_class_destroy
 {
    local _class="$1"
-   local _device="$2"
+   local _interface="$2"
    local _args="${@:3}"
    ! if_class_exists "$_class" && return 1
 
    local _class_destroy="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "destroy")"
    [ ! -x "$_class_destroy" ] && return 2
 
-   $_class_destroy "$_device" "$_args"
+   $_class_destroy "$_interface" $_args
    [ "$?" != "0" ] && return 3
-
-   local _dev_path="$(if_dev_path "$_device")"
-   proc_silent rm -rf "$_dev_path"
 
    return 0
 }
@@ -220,10 +210,23 @@ function if_interface_address_set
    return 0
 }
 
-function if_interface_network_ipv4
+function if_interface_ipv4_network
 {
    local _interface="$1"
    ! if_interface_exists "$_interface" && return 1
+
+   _ipv4_address="$(if_interface_address_get "$_interface" inet)"
+   [ -z "$_ipv4_address" ] && return 2
+
+   _netmask_address="$(if_interface_address_get "$_interface" netmask)"
+   _cidr_mask="$(ipv4_netmask_to_cidr_mask "$_netmask_address")"
+
+   _netmask_value="$(ipv4_to_int "$_netmask_address")"
+   _ipv4_value="$(( $(ipv4_to_int "$_ipv4_address") & $_netmask_value ))"
+   _ipv4_network="$(ipv4_from_int "$_ipv4_value")"
+
+   echo "$_ipv4_network/$_cidr_mask"
+   return 0
 }
 
 function if_interface_ether_get

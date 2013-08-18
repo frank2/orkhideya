@@ -157,7 +157,7 @@ function proc_label_spawn
    sleep 1
 
    local _resulting_pid="$(ps kstart_time ax | sort -r | grep "$(echo $_commandline | awk '{ print $1 }')" | grep -v grep | head -n1 | awk '{ print $1 }')"
-   if [ -z "$_resulting_pid" -o "$_resulting_pid" -lt "$_new_pid" ]; then 
+   if [ -z "$_resulting_pid" -o -z "$_new_pid" -o "$_resulting_pid" -lt "$_new_pid" ]; then 
       stdout_error "Fork failure."
 
       proc_silent rm -rf "$_pidpath" 
@@ -178,7 +178,7 @@ function proc_label_spawn_silent
 
    ! ln -s "/dev/null" "$_stdoutfile" && return -1
    ! ln -s "/dev/null" "$_stderrfile" && return -2
-   proc_label_spawn "$_label" $_commandline
+   proc_label_spawn "$_label" $_commandline &>/dev/null
    return $?
 }
 
@@ -197,7 +197,7 @@ function proc_label_kill
 
    if proc_label_is_running "$_label"; then
       local _pid="$(proc_label_get_pid "$_label")"
-      [ -n "$_pid" ] && proc_silent kill -9 "$_pid"
+      [ -n "$_pid" ] && kill -9 "$_pid"
    fi 
 
    proc_silent rm -rf "$_procpath"
