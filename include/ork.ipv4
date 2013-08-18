@@ -22,6 +22,48 @@ function ipv4_valid
    return $?
 }
 
+function ipv4_to_int
+{
+   local _address="$1"
+   local _number="0"
+
+   if ! ipv4_valid "$_address"; then return 1; fi
+
+   for _chunk in $(seq 1 4); do
+      local _octet="$(echo "$_address" | awk -F '.' "{ print \$$_chunk }")"
+      _number="$(($_number | ($_octet << 32 - (8 * $_chunk))))"
+   done
+
+   echo $_number
+   return 0
+}
+
+function ipv4_from_int
+{
+   local _number="$(stdlib_tolower "$1")"
+
+   if echo $_number | grep -q '^[0-9a-f]$'; then
+      _number="$(($_number))"
+   elif echo $_number | grep -q '[^0-9]'; then
+      return 1
+   fi
+
+   if [ "$_number" -lt "0" -o "$_number" -gt "$(ipv4_mask 32)" ]; then return 2; fi
+
+   local _address=""
+
+   for _chunk in $(seq 1 4); do
+      if [ -n "$_address" ]; then
+         _address="${_address}."
+      fi
+
+      _address="${_address}$(( ($_number >> (32 - ($_chunk * 8))) & 0xFF ))"
+   done
+
+   echo "$_address"
+   return 0
+}
+
 function ipv4_cidr_valid
 {
    local _cidr="$1"
@@ -94,6 +136,44 @@ function ipv4_cidr_is_subnet
    return 0
 }
 
+function ipv4_cidr_enum
+{
+   local _cidr="$1"
+   ! ipv4_cidr_valid "$_cidr" && return 1
+
+   nmap -sL -n "$_cidr" | grep -o -P '\d+\.\d+\.\d+\.\d+' | tail -n+2 | head -n-1
+   return 0
+}
+
+function ipv4_cidr_random_address
+{
+   local _cidr="$1"
+   ! ipv4_cidr_valid "$_cidr" && return 1
+
+   local _inverted_mask="$(( $(ipv4_mask "$(ipv4_cidr_mask "$_cidr")") ^ 0xFFFFFFFF ))"
+   local _new_address="$(( $(ipv4_to_int "$(ipv4_cidr_network "$_cidr")") | $(( ( ($RANDOM << 16) | $RANDOM) & $_inverted_mask )) ))"
+
+   echo "$(ipv4_from_int $_new_address)"
+   return 0
+}
+
+function ipv4_cidr_random_subnet
+{
+   local _cidr="$1"
+   ! ipv4_cidr_valid "$_cidr" && return 1
+
+   local _cidr_mask="$(ipv4_cidr_mask "$_cidr")"
+   local _size="$2"
+   if [ -z "$_size" ]; then _size="24"; fi
+   [ "$_size" -lt "0" -o "$_size" -gt "32" -o "$_size" -lt "$_cidr_mask" ] && return 2
+
+   local _random_base_address="$(ipv4_cidr_random_address "$_cidr")"
+   local _new_cidr="$_random_base_address/$_size"
+
+   echo "$(ipv4_cidr_network "$_new_cidr")/$_size"
+   return 0
+}
+
 function ipv4_netmask_to_cidr_mask
 {
    local _netmask="$1"
@@ -118,56 +198,5 @@ function ipv4_netmask_to_cidr_mask
    done
 
    echo "$((32-$_number_value))"
-   return 0
-}
-
-function ipv4_to_int
-{
-   local _address="$1"
-   local _number="0"
-
-   if ! ipv4_valid "$_address"; then return 1; fi
-
-   for _chunk in $(seq 1 4); do
-      local _octet="$(echo "$_address" | awk -F '.' "{ print \$$_chunk }")"
-      _number="$(($_number | ($_octet << 32 - (8 * $_chunk))))"
-   done
-
-   echo $_number
-   return 0
-}
-
-function ipv4_from_int
-{
-   local _number="$(stdlib_tolower "$1")"
-
-   if echo $_number | grep -q '^[0-9a-f]$'; then
-      _number="$(($_number))"
-   elif echo $_number | grep -q '[^0-9]'; then
-      return 1
-   fi
-
-   if [ "$_number" -lt "0" -o "$_number" -gt "$(ipv4_mask 32)" ]; then return 2; fi
-
-   local _address=""
-
-   for _chunk in $(seq 1 4); do
-      if [ -n "$_address" ]; then
-         _address="${_address}."
-      fi
-
-      _address="${_address}$(( ($_number >> (32 - ($_chunk * 8))) & 0xFF ))"
-   done
-
-   echo "$_address"
-   return 0
-}
-
-function ipv4_cidr_enum
-{
-   local _cidr="$1"
-   ! ipv4_cidr_valid "$_cidr" && return 1
-
-   nmap -sL -n "$_cidr" | grep -o -P '\d+\.\d+\.\d+\.\d+' | tail -n+2 | head -n-1
    return 0
 }
