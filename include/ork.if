@@ -46,7 +46,7 @@ function if_class_exists
 function if_dev_exists
 {
    local _dev="$1"
-   test -d "$(if_dev_path "$_dev")"
+   test -n "$_dev" -a -d "$(if_dev_path "$_dev")"
    return $?
 }
 
@@ -59,8 +59,14 @@ function if_class_create
    local _class_create="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "create")"
    [ ! -x "$_class_create" ] && return 2
 
-   local _new_interface="$($_class_create "$_args")"
-   if [ "$?" != "0" ]; then return 3; fi
+   local _tmpfile="$(stdlib_tmpfile "$class-interface")"
+
+   "$_class_create" $_args 1>"$_tmpfile"
+   _status="$?"
+   _new_interface="$(cat "$_tmpfile")"
+   shred -u "$_tmpfile" &>/dev/null
+
+   if [ "$_status" != "0" ]; then return 3; fi
 
    echo "$_new_interface"
    return 0
@@ -76,7 +82,7 @@ function if_class_destroy
    local _class_destroy="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "destroy")"
    [ ! -x "$_class_destroy" ] && return 2
 
-   $_class_destroy "$_interface" $_args
+   "$_class_destroy" "$_interface" $_args
    [ "$?" != "0" ] && return 3
 
    return 0
