@@ -268,6 +268,31 @@ function if_interface_link_wait
    return 0
 }
 
+function if_interface_list
+{
+   ifconfig -a -s | tail -n+2 | awk '{ print $1 }'
+}
+
+function if_interface_by_network
+{
+   local _network="$1"
+   ! ipv4_cidr_valid "$_network" && return 1
+
+   local _got_interface="0"
+
+   for _interface in $(if_interface_list); do
+      _interface_network="$(if_interface_ipv4_network "$_interface")"
+
+      if ipv4_cidr_is_subnet "$_interface_network" "$_network"; then
+         _got_interface="1"
+         echo "$_interface"
+      fi
+   done
+
+   [ "$_got_interface" == "0" ] && return 2
+   return 0
+}
+
 function if_dev_is_up
 {
    local _device="$1"

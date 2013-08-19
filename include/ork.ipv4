@@ -69,8 +69,8 @@ function ipv4_cidr_valid
    local _cidr="$1"
    if ! ( echo "$_cidr" | grep -q '/' ) || [ "$(stdlib_strcount '/' "$_cidr")" -gt 1 ]; then return 1; fi
 
-   _address="$(echo "$_cidr" | awk -F '/' '{ print $1 }')"
-   _network="$(echo "$_cidr" | awk -F '/' '{ print $2 }')"
+   local _address="$(echo "$_cidr" | awk -F '/' '{ print $1 }')"
+   local _network="$(echo "$_cidr" | awk -F '/' '{ print $2 }')"
    [ -z "$(echo $_network | egrep -o '^[0-9]+$')" ] && return 2
 
    ipv4_valid "$_address" && [ "$_network" -ge "0" -a "$_network" -le "32" ]
@@ -90,7 +90,8 @@ function ipv4_cidr_netmask
    local _cidr="$1"
    ! ipv4_cidr_valid "$_cidr" && return 1
 
-   ipv4_from_int "$(ipv4_mask "$(ipv4_cidr_mask "$_cidr")")"
+   ! ipv4_from_int "$(ipv4_mask "$(ipv4_cidr_mask "$_cidr")")" && return 2
+   return 0
 }
 
 function ipv4_cidr_network
@@ -101,7 +102,7 @@ function ipv4_cidr_network
    local _address="$(ipv4_to_int $(echo "$_cidr" | awk -F '/' '{ print $1 }') )"
    local _mask="$(ipv4_to_int $(ipv4_cidr_netmask "$_cidr"))"
 
-   echo "$(ipv4_from_int "$(($_address & $_mask))")"
+   ! ipv4_from_int "$(($_address & $_mask))" && return 2
    return 0
 }
 
@@ -114,25 +115,27 @@ function ipv4_cidr_broadcast
    _netmask="$(($_netmask ^ 0xFFFFFFFF))"
 
    local _network="$(ipv4_to_int "$(ipv4_cidr_network "$_cidr")")"
-   local _broadcast="$(ipv4_from_int $(($_network | $_netmask)))"
-
-   echo "$_broadcast"
+   ! ipv4_from_int "$(($_network | $_netmask))" && return 2
    return 0
 }
 
 function ipv4_cidr_is_subnet
 {
    local _network="$1"
-   ! ipv4_cidr_valid "$_networK" && return 1
+   ! ipv4_cidr_valid "$_network" && return 1
 
    local _subnet="$2"
    ! ipv4_cidr_valid "$_subnet" && return 2
 
-   local _network_value="$(ipv4_to_int "$(ipv4_cidr_network "$_network")")"
-   local _subnet_value="$(ipv4_to_int "$(ipv4_cidr_network "$_subnet")")"
-   local _mashed_value="$(($_network_value & $_subnet_value))"
+   local _network_mask="$(ipv4_cidr_mask "$_network")"
+   local _subnet_mask="$(ipv4_cidr_mask "$_subnet")"
+   [ "$_network_mask" -gt "$_subnet_mask" ] && return 3
 
-   [ "$_mashed_value" != "$_network_value" -a "$_mashed_value" != "$_subnet_value" ] && return 3
+   local _network_value="$(ipv4_cidr_network "$_network")"
+   local _subnet_upgrade="$(ipv4_cidr_network "$_subnet")/$_network_mask"
+   local _upgrade_value="$(ipv4_cidr_network "$_subnet_upgrade")"
+
+   [ "$_upgrade_value" != "$_network_value" ] && return 4
    return 0
 }
 
@@ -198,5 +201,82 @@ function ipv4_netmask_to_cidr_mask
    done
 
    echo "$((32-$_number_value))"
+   return 0
+}
+
+function ipv4_address_in_cidr
+{
+   local _address="$1"
+   ! ipv4_valid "$_address" && return 1
+
+   local _cidr="$2"
+   ! ipv4_cidr_valid "$_cidr" && return 2
+
+   local _network="$(ipv4_cidr_network "$_cidr")"
+   local _netmask="$(ipv4_cidr_netmask "$_cidr")"
+
+   local _address_value="$(ipv4_to_int "$_address")"
+   local _netmask_value="$(ipv4_to_int "$_netmask")"
+   local _mashed_value="$(ipv4_from_int "$(($_address_value & $_netmask_value))")"
+
+   [ "$_network" != "$_mashed_value" ] && return 3
+   return 0
+}
+
+function ipv4_address_is_private
+{
+   local _address="$1"
+   ! ipv4_valid "$_address" && return 1
+   ipv4_address_in_cidr "$_address" "10.0.0.0/8" && return 0
+   ipv4_address_in_cidr "$_address" "172.16.0.0/12" && return 0
+   ipv4_address_in_cidr "$_address" "192.168.0.0/16" && return 0
+   return 2
+}
+
+function ipv4_random_address
+{
+   local _random_32b="$((($RANDOM << 16) | $RANDOM))"
+   ipv4_from_int "$_random_32b"
+}
+
+function ipv4_random_public_address
+{
+   local _random_address="$(ipv4_random_address)"
+
+   while ipv4_address_is_private "$_random_address"; do _random_address="$(ipv4_random_address)"; done
+
+   echo "$_random_address"
+   return 0
+}
+
+function ipv4_random_private_address
+{
+   local _subnets="192.168.0.0/16 172.16.0.0/12 10.0.0.0/8"
+
+   local _potential_subnets="$(stdlib_strcount ' ' "$_subnets")"
+   local _chosen_subnet="$(echo $_subnets | awk "{ print \$$(($RANDOM % 3)) }")"
+
+   ! ipv4_cidr_random_subnet "$_chosen_subnet" "$_size" && return 2
+   return 0
+}
+
+function ipv4_random_private_network
+{
+   local _size="$1"
+
+   if [ -z "$_size" ]; then _size="24"; fi
+   [ "$_size" -lt "8" -o "$_size" -ge "32" ] && return 1
+   
+   local _subnets=""
+
+   if [ "$_size" -ge "16" ]; then _subnets="$_subnets 192.168.0.0/16"; fi
+   if [ "$_size" -ge "12" ]; then _subnets="$_subnets 172.16.0.0/12"; fi
+   if [ "$_size" -ge "8" ]; then _subnets="$_subnets 10.0.0.0/8"; fi
+
+   local _potential_subnets="$(stdlib_strcount ' ' "$_subnets")"
+   local _chosen_subnet="$(($RANDOM % ($_potential_subnets+1) + 1))"
+   _chosen_subnet="$(echo $_subnets | awk "{ print \$${_chosen_subnet} }")"
+
+   ! ipv4_cidr_random_subnet "$_chosen_subnet" "$_size" && return 2
    return 0
 }
