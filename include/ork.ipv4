@@ -233,6 +233,26 @@ function ipv4_address_is_private
    return 2
 }
 
+function ipv4_address_add
+{
+   local _address="$1"
+   ! ipv4_valid "$_address" && return 1
+
+   local _value="$2"
+   ! ipv4_from_int "$(($(ipv4_to_int "$_address") + $_value))" && return 2
+   return 0
+}
+
+function ipv4_address_sub
+{
+   local _address="$1"
+   ! ipv4_valid "$_address" && return 1
+
+   local _value="$2"
+   ! ipv4_from_int "$(($(ipv4_to_int "$_address") - $_value))" && return 2
+   return 0
+}
+
 function ipv4_random_address
 {
    local _random_32b="$((($RANDOM << 16) | $RANDOM))"

@@ -130,7 +130,7 @@ function if_interface_unique_name
 function if_interface_exists
 {
    local _interface="$1"
-   test -n "$(ifconfig -a | grep "^${_interface}:")"
+   test -L "/sys/class/net/$_interface"
    return $?
 }
 
@@ -296,6 +296,19 @@ function if_interface_by_network
    done
 
    [ "$_got_interface" == "0" ] && return 2
+   return 0
+}
+
+function if_interface_gateway
+{
+   local _interface="$1"
+   [ -z "$_interface" ] && return 1
+   ! if_interface_exists "$_interface" && return 2
+
+   _gateway="$(netstat -rn | grep '^0.0.0.0' | awk '{ print $8 }')"
+   [ -z "$_gateway" ] && return 3
+
+   echo "$_gateway"
    return 0
 }
 

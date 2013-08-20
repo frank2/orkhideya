@@ -52,8 +52,8 @@ function ork_pathroot
 function ork_verify
 {
    local _library="$1"
-   local _ifs=$IFS
-   IFS=':'
+   local _ifs="$IFS"
+   IFS=":"
 
    for _path in $ORK_PATH; do
       local _filename="$_path/ork.$_library"
@@ -61,7 +61,7 @@ function ork_verify
       if [ -r "$_filename" ]; then break; fi
    done
 
-   IFS=$_ifs
+   IFS="$_ifs"
 
    if [ ! -r "$_filename" ]; then 
       echo "$EXECUTOR: orkhideya: bad library (fatal): $_library" 1>&2
@@ -98,8 +98,8 @@ function ork_reconfigure
 function ork_edit
 {
    local _library="$1"
-   local _ifs=$IFS
-   IFS=':'
+   local _ifs="$IFS"
+   IFS=":"
 
    for _path in $ORK_PATH; do
       local _filename="$_path/ork.$_library"
@@ -107,7 +107,7 @@ function ork_edit
       if [ -r "$_filename" ]; then break; fi
    done
 
-   IFS=$_ifs
+   IFS="$_ifs"
 
    if [ ! -r "$_filename" ]; then return 1; fi
    if [ ! -x "$EDITOR" -a ! -x "$(which $EDITOR)" ]; then return 2; fi
@@ -119,13 +119,13 @@ function ork_edit
 function ork_include
 {
    local _library="$1"
-   local _ifs=$IFS
+   local _ifs="$IFS"
 
    if [ "$_library" == "-" ]; then
-      IFS=':'
+      IFS=":"
 
       for _path in $ORK_PATH; do
-         IFS=$_ifs
+         IFS="$_ifs"
 
          for _file in $(find "$_path" -name "ork.*" -type f); do
             local _library="$(echo $_file | awk -F '/' '{ print $NF }' | sed -e 's/^ork\.//g')"
@@ -141,15 +141,14 @@ function ork_include
             fi
          done
          
-         _ifs=$IFS
-         IFS=':'
+         IFS=":"
       done
 
+      IFS="$_ifs"
       return 0
    fi
 
-   _ifs=$IFS
-   IFS=':'
+   IFS=":"
 
    for _path in $ORK_PATH; do
       local _filename="$_path/ork.$_library"
@@ -157,7 +156,7 @@ function ork_include
       if [ -r "$_filename" ]; then break; fi
    done
 
-   IFS=$_ifs
+   IFS="$_ifs"
 
    if [ ! -r "$_filename" ]; then
       echo "$EXECUTOR: orkhideya: bad include (fatal): $_library ($_filename)" 1>&2

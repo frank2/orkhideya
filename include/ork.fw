@@ -24,31 +24,45 @@ function fw_rule_exists
    return $?
 }
 
-function fw_rule_dev_apply
+function fw_rule_interface_apply
 {
-   local _device="$1"
+   local _interface="$1"
    local _rule="$2"
-   local _args=${@:3}
-   ! if_dev_exists "$_device" && return 1
+   local _args="${@:3}"
+   ! if_interface_exists "$_interface" && return 1
 
    local _firewall_file="$(stdlib_filesearch  "$(fw_rule_path)" "$(stdlib_pathify "$_rule")" 'rule')"
    [ -z "$_firewall_file" ] && return 2
    [ ! -x "$_firewall_file" ] && return 3
-   ! "$_firewall_file" "$_device" $_args && return 4
+   ! "$_firewall_file" "$_interface" $_args && return 4
+   return 0
+}
+
+function fw_rule_dev_apply
+{
+   local _device="$1"
+   local _rule="$2"
+   local _args="${@:3}"
+   ! if_dev_exists "$_device" && return 1
+
+   local _interface="$(if_dev_interface "$_device")"
+   [ -z "$_interface" ] && return 2
+   ! if_interface_exists "$_interface" && return 3
+   ! fw_rule_interface_apply "$_interface" "$_rule" $_args && return 4
    return 0
 }
 
 function fw_raw
 {
    local _protocol="$(stdlib_toupper $1)"
-   local _args=${@:2}
+   local _args="${@:2}"
 
    if [ "$_protocol" != "4" -a "$_protocol" != "6" -a "$_protocol" != "D" ]; then
       return 1
    fi
 
    if [ "$_protocol" == "4" -o "$_protocol" == "D" ]; then
-      ! iptables $_args && return 2
+      ! iptables $_args && return 2 
    fi
 
    if [ "$_protocol" == "6" -o "$_protocol" == "D" ]; then
@@ -62,9 +76,8 @@ function fw_append
 { 
    local _protocol="$(stdlib_toupper $1)"
    local _chain="$(stdlib_toupper $2)"
-   local _args=${@:3}
+   local _args="${@:3}"
 
-   fw_check "$_protocol" "$_chain" $_args && return 0
    ! fw_raw "$_protocol" -A "$_chain" $_args && return 1
    return 0
 }
@@ -91,7 +104,7 @@ function fw_check
 { 
    local _protocol="$(stdlib_toupper $1)"
    local _chain="$(stdlib_toupper $2)"
-   local _args=${@:3}
+   local _args="${@:3}"
 
    fw_raw "$_protocol" -C "$_chain" $_args
    return $?
@@ -119,7 +132,7 @@ function fw_delete
 { 
    local _protocol="$(stdlib_toupper $1)"
    local _chain="$(stdlib_toupper $2)"
-   local _args=${@:3}
+   local _args="${@:3}"
 
    ! fw_raw "$_protocol" -D "$_chain" $_args && return 1
    return 0
@@ -143,30 +156,93 @@ function fw_delete_6
    return 0
 }
 
+function fw_list
+{ 
+   local _protocol="$(stdlib_toupper $1)"
+   local _chain="$(stdlib_toupper $2)"
+   local _args="${@:3}"
+
+   ! fw_raw "$_protocol" -S "$_chain" $_args && return 1
+   return 0
+}
+
+function fw_list_d
+{
+   ! fw_list D $@ && return 1
+   return 0
+}
+
+function fw_list_4
+{
+   ! fw_list 4 $@ && return 1
+   return 0
+}
+
+function fw_list_6
+{
+   ! fw_list 6 $@ && return 1
+   return 0
+}
+
+function fw_clear_interface
+{
+   local _protocol="$(stdlib_toupper $1)"
+   local _chain="$(stdlib_toupper $2)"
+   local _interface="$3"
+   ! if_interface_exists "$_interface" && return 1
+
+   local _args="${@:4}"
+   local _grep_query="$_interface"
+   local _interface_network="$(if_interface_ipv4_network "$_interface")"
+
+   if [ -n "$_interface_network" ]; then
+      _grep_query="($_interface|$_interface_network)"
+   fi
+
+   # fuck the IFS variable
+   local _tmpfile="$(stdlib_tmpfile)"
+   fw_list "$_protocol" "$_chain" $_args | egrep -- "-[a-z]+ $_grep_query[[:space:]]+" > $_tmpfile
+   local _lines="$(wc -l "$_tmpfile" | awk '{ print $1 }')"
+
+   for _rule in $(seq 1 $_lines); do
+      local _clean_rule="$(head -n"$_rule" "$_tmpfile" | tail -n1 | cut -d ' ' -f 3-)"
+      fw_delete "$_protocol" "$_chain" "$_clean_rule" $_args
+   done
+
+   shred -u "$_tmpfile" &>/dev/null
+   return 0
+}
+
+function fw_clear_interface_d
+{
+   ! fw_clear_interface D $@ && return 1
+   return 0
+}
+
+function fw_clear_interface_4
+{
+   ! fw_clear_interface 4 $@ && return 1
+   return 0
+}
+
+function fw_clear_interface_6
+{
+   ! fw_clear_interface 6 $@ && return 1
+   return 0
+}
+
 function fw_clear_device
 {
    local _protocol="$(stdlib_toupper $1)"
    local _chain="$(stdlib_toupper $2)"
-   local _device="$3"
-   ! if_dev_exists "$_device" && return 1
+   local _dev="$3"
+   ! if_dev_exists "$_dev" && return 1
 
-   local _interface="$(if_dev_interface "$_device")"
+   local _args="${@:4}"
+   local _interface="$(if_dev_interface "$_dev")"
    [ -z "$_interface" ] && return 2
    ! if_interface_exists "$_interface" && return 3
-
-   local _ifs="$IFS"
-   IFS="
-"
-   
-   for _rule in $(iptables -S "$_chain" | egrep -- "-[a-z]+ $_interface[[:space:]]+"); do
-      IFS=" "
-      local _clean_rule=$(echo $_rule | cut -d ' ' -f 3-)
-      fw_delete "$_protocol" "$_chain" "$_clean_rule"
-      IFS="
-"
-   done
-
-   IFS="$_ifs"
+   ! fw_clear_interface "$_protocol" "$_chain" "$_interface" $_args && return 4
 
    return 0
 }

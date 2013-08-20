@@ -77,7 +77,7 @@ function ssh_site_config_build
    local _search_path="$_site_root/$(stdlib_pathify $_site)"
    local _config_paths=$(for _config_path in $(find $_search_path -type d); do echo $(stdlib_strcount '/' "$_config_path") "$_config_path"; done | sort -g -r | awk '{ print $2 }' | sed -e "s,^$_site_root,,")
 
-   OLDIFS=$IFS
+   local _ifs="$IFS"
    IFS="
 "
 
@@ -136,7 +136,7 @@ function ssh_site_config_build
       fi
    done
 
-   IFS=$OLDIFS
+   IFS="$_ifs"
    return 0
 }
 
