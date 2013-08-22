@@ -27,8 +27,11 @@ function ork_pathroot
       root)
          echo $ORK_ROOT
          ;;
-      etc)
-         ork_pathcat $ORK_ETC
+      etc-global)
+         ork_pathcat $ORK_ETC_GLOBAL
+         ;;
+      etc-local)
+         ork_pathcat $ORK_ETC_LOCAL
          ;;
       bin)
          ork_pathcat $ORK_BIN
@@ -76,7 +79,10 @@ function ork_configpath
    _library="$1"
    ork_verify "$_library"
 
-   ork_pathcat "$(ork_pathroot etc)" "$_library"
+   _local_version="$(ork_pathcat "$(ork_pathroot etc-local)" "$_library")"
+   _global_version="$(ork_pathcat "$(ork_pathroot etc-global)" "$_library")"
+
+   if [ ! -d "$_local_version" ]; then echo "$_global_version"; else echo "$_local_version"; fi
    return 0
 }
 
@@ -182,7 +188,8 @@ function ork_include
 ORK_ROOT="/usr/local/lib/orkhideya"
 
 # modify these variables if you care a lot more about where things go
-ORK_ETC="etc"
+ORK_ETC_GLOBAL="etc"
+ORK_ETC_LOCAL="$HOME/local/etc/orkhideya"
 ORK_BIN="bin"
 ORK_VAR="var"
 ORK_TMP="tmp"
