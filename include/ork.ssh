@@ -1,11 +1,12 @@
 #!/bin/bash
 
+source orkhideya
 ork_include stdlib
 ork_include stdout
 
 function ssh_root
 {
-   ork_configpath ssh
+   ork_configpath "ssh"
    return 0
 }
 
