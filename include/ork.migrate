@@ -249,7 +249,7 @@ function migrate_ssh
    local _tarball="$(migrate_strategy_build_tarball "$_strategy" "$_label" "$_root")"
    if [ "$?" != "0" ]; then return 3; fi
 
-   cat "$_tarball" | ssh "$_site" "tar xzf - && "$_root/install" "$_root" ; _status=\$?; rm -rf "$_root" 2>/dev/null; exit \$_status"
+   cat "$_tarball" | ssh "$_site" "tar xmzf - && "$_root/install" "$_root" ; _status=\$?; rm -rf "$_root" 2>/dev/null; exit \$_status"
    local _status="$?"
    shred -u "$_tarball"
 

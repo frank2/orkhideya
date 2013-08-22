@@ -189,8 +189,8 @@ ORK_TMP="tmp"
 ORK_INCLUDE="include"
 
 # allow these base variables to be overwritten by the system or user
-if [ -f "/etc/orkhideya" -a -r "/etc/orkhideya" ]; then
-   source /etc/orkhideya
+if [ -r "/etc/orkhideya/config" ]; then
+   source /etc/orkhideya/config
 fi
 
 if [ -f "$HOME/.orkhideya" -a -r "$HOME/.orkhideya" ]; then

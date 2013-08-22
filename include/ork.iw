@@ -203,6 +203,53 @@ function iw_ap_postdown
    return 0
 }
 
+function iw_ap_best_bssid
+{
+   local _ap="$1"
+   ! iw_ap_exists "$_ap" && return 1
+
+   local _device="$2"
+   ! if_dev_exists "$_device" && return 2
+   [ "$(iw_dev_get_mode "$_device")" != "managed" ] && return 3
+
+   local _bssid="$(iw_ap_bssid "$_ap")"
+   [ -z "$_bssid" ] && return 4
+
+   if [ "$(stdlib_strcount ' ' "$_bssid")" == "0" ]; then 
+      echo "$_bssid"
+      return 0
+   fi
+
+   local _ifs="$IFS"
+
+   local _tmp_result="$(stdlib_tmpfile)"
+
+   for _seq in $(seq 1 5); do
+      IFS="
+"
+
+      for _scan_entry in $(iw_dev_scan "$_device"); do
+         local _scan_bssid="$(iw_scan_attr "$_scan_entry" Address)"
+
+         if [ -n "$(echo "$_bssid" | grep -i -o "$_scan_bssid")" ]; then
+            echo "$(iw_scan_signal "$_scan_entry" | awk -F '/' '{ print $1 }') $_scan_bssid" >> "$_tmp_result"
+         fi
+      done
+
+      IFS="$_ifs"
+      local _new_bssid="$(cat "$_tmp_result" | sort -r -h | head -n1 | awk '{ print $2 }')"
+      shred -u "$_tmp_result"
+
+      if [ -n "$_new_bssid" ]; then break; fi
+      sleep 1
+   done
+
+   [ "$_seq" == "5" ] && return 5
+
+   echo "$_new_bssid"
+   return 0
+}
+
 function iw_ap_connect
 {
    local _ap="$1"
@@ -212,7 +259,7 @@ function iw_ap_connect
    ! if_dev_exists "$_device" && return 2
    ! iw_dev_set_mode "$_device" managed && return 3
 
-   local _bssid="$(iw_ap_bssid "$_ap")"
+   local _bssid="$(iw_ap_best_bssid "$_ap" "$_device")"
    [ -z "$_bssid" ] && return 4
 
    local _essid="$(iw_ap_essid "$_ap")"

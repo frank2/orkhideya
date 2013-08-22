@@ -50,6 +50,15 @@ function if_dev_exists
    return $?
 }
 
+function if_gateway_interface
+{
+   _gateway="$(netstat -rn | grep '^0.0.0.0' | awk '{ print $8 }')"
+   [ -z "$_gateway" ] && return 3
+
+   echo "$_gateway"
+   return 0
+}
+
 function if_class_create
 {
    local _class="$1"
@@ -59,7 +68,7 @@ function if_class_create
    local _class_create="$(stdlib_filesearch "$(if_class_root)" "$(stdlib_pathify "$_class")" "create")"
    [ ! -x "$_class_create" ] && return 2
 
-   local _tmpfile="$(stdlib_tmpfile "$class-interface")"
+   local _tmpfile="$(stdlib_tmpfile "$_class-interface")"
 
    "$_class_create" $_args 1>"$_tmpfile"
    _status="$?"
@@ -296,19 +305,6 @@ function if_interface_by_network
    done
 
    [ "$_got_interface" == "0" ] && return 2
-   return 0
-}
-
-function if_interface_gateway
-{
-   local _interface="$1"
-   [ -z "$_interface" ] && return 1
-   ! if_interface_exists "$_interface" && return 2
-
-   _gateway="$(netstat -rn | grep '^0.0.0.0' | awk '{ print $8 }')"
-   [ -z "$_gateway" ] && return 3
-
-   echo "$_gateway"
    return 0
 }
 
