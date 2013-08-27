@@ -159,7 +159,7 @@ function ssh_site_config_build
       fi
 
       if [ -e "$_site_proxy" ]; then
-         printf "\tProxyCommand %s %%n %%h %%p\n\n" "$_site_key"
+         printf "\tProxyCommand %s %%h %%p\n\n" "$_site_proxy"
       fi
 
       if [ -n "$_executable_config" ]; then
