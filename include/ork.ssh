@@ -52,6 +52,15 @@ function ssh_site_config_file
    return 0
 }
 
+function ssh_site_proxy_file
+{
+   _site="$1"
+   if ! ssh_site_exists "$_site"; then return 1; fi
+
+   echo "$(ssh_site_path $_site)/proxy"
+   return 0
+}
+
 function ssh_key_file
 {
    # an ssh site can exist without a keyfile, but not the other way around.
@@ -83,16 +92,29 @@ function ssh_site_config_build
 "
 
    for _config_path in $_config_paths; do
+      # take care before attempting to break/continue this loop. the logic
+      # was written in a specific way to handle a series of edge-cases.
+
       local _inferred_host="$(stdlib_configify "${_config_path:1}")"
       local _site_config="$(ssh_site_config_file "$_inferred_host")"
+      local _site_proxy="$(ssh_site_proxy_file "$_inferred_host")"
       local _site_key="$(ssh_site_key "$_inferred_host")"
       local _site_host=""
       
-      if [ -e "$_site_key" ]; then
+      if [ -e "$_site_key" -o -e "$_site_proxy" ]; then
          _site_host="$_inferred_host"
       fi
 
-      if [ -n "$(test -e "$_site_config" && cat "$_site_config")" ]; then
+      if [ -x "$_site_config" ]; then
+         local _executable_config="1"
+         local _executable_output="$(stdlib_tmpfile)"
+
+         "$_site_config" > "$_executable_output"
+
+         _site_config="$_executable_output"
+      fi
+
+      if [ -n "$(test -r "$_site_config" && cat "$_site_config")" ]; then
          local _config_host="$(grep -o -P '^Host\s+(.*)$' "$_site_config" | awk '{ print $2 }')"
 
          if [ -n "$_config_host" ]; then
@@ -105,7 +127,7 @@ function ssh_site_config_build
       if [ -n "$_site_host" -a -z "$_config_host" ]; then
          local _occurrences="$(stdlib_strcount "$_config_path" "$_config_paths")"
 
-         if [ -e "$_site_key" -o -e "$_site_config" ]; then
+         if [ -e "$_site_key" -o -e "$_site_config" -o -e "$_site_proxy" ]; then
             if [ "$_occurrences" -gt 1 ]; then
                if [ -n "$(test -e "$_site_config" && grep -o -P '^\s*HostName\s+' "$_site_config")" ]; then
                   echo "Host ${_site_host}.* $_site_host"
@@ -116,7 +138,7 @@ function ssh_site_config_build
                echo "Host $_site_host"
             fi
          fi
-      elif [ -z "$_site_host" -a -z "$_config_host" -a \( -n "$(test -e "$_site_config" && cat "$_site_config")" -o -e "$_site_key" \) ]; then
+      elif [ -z "$_site_host" -a -z "$_config_host" -a \( -n "$(test -e "$_site_config" && cat "$_site_config")" -o -e "$_site_key" -o -e "$_site_proxy" \) ]; then
          echo "Host *"
       fi
 
@@ -134,6 +156,15 @@ function ssh_site_config_build
 
       if [ -e "$_site_key" ]; then
          printf "\tIdentityFile %s\n\n" "$_site_key"
+      fi
+
+      if [ -e "$_site_proxy" ]; then
+         printf "\tProxyCommand %s %%n %%h %%p\n\n" "$_site_key"
+      fi
+
+      if [ -n "$_executable_config" ]; then
+         shred -u "$_executable_output"
+         _executable_config=""
       fi
    done
 
@@ -303,6 +334,19 @@ function ssh_key_exchange
    fi
 
    stdout_normal "Key exchanged successfully."
+   return 0
+}
+
+function ssh_site_list
+{
+   local _site="$1"
+
+   if [ "$_site" == "-" ]; then _site=""; fi
+
+   if [ -n "$_site" ]; then local _site_prefix="${_site}."; fi
+
+   local _site_root="$(ork_pathcat "$(ssh_site_path)" "$(stdlib_pathify "$_site")")"
+   find "$_site_root" -type d | tail -n+2 | sed -e "s,^$_site_root/,$_site_prefix," | sed -e 's,/,.,g'
    return 0
 }
 
