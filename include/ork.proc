@@ -24,7 +24,7 @@ function proc_silent
 function proc_is_running
 {
    _pid="$1"
-   test -n "$(ps -p "$_pid" | tail -n+2)"
+   test -n "$_pid" -a -n "$(ps -p "$_pid" | tail -n+2)"
    return $?
 }
 
@@ -132,7 +132,11 @@ function proc_label_is_running
    local _label="$1"
 
    ! proc_label_exists "$_label" && return 1
-   ! proc_is_running "$(proc_label_get_pid "$_label")" && return 2
+
+   local _pid="$(proc_label_get_pid "$_label")"
+   test -z "$_pid" && return 2
+   ! proc_is_running "$_pid" && return 3
+   
    return 0
 }
 
