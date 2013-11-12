@@ -1,0 +1,4 @@
+#!/bin/bash
+
+export ORK_DEBUG=1
+source orkhideya

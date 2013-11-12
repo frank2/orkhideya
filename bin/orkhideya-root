@@ -1,10 +1,29 @@
 #!/bin/bash
 
 source orkhideya
+ork_include stdlib
 ork_include stdout
 
 if [ "$(id -u)" != "0" ]; then
-   stdout_warning Root is required to continue.
+   _informer="$(stdlib_tmpfile inform-root-required)"
+
+   if [ ! -e "$_informer" ]; then
+      stdout_warning Root is required to continue.
+      echo 1 > "$_informer"
+   else
+      _informed="$(cat "$_informer")"
+      echo $(($_informed+1)) > "$_informer"
+   fi
+
    sudo -E -- "$0" "$@" 
-   exit $?
+   _status="$?"
+   _informed="$(cat "$_informer")"
+
+   if [ "$_informed" == "1" ]; then
+      shred -u "$_informer"
+   else
+      echo $(($_informed-1)) > "$_informer"
+   fi
+
+   exit $_status
 fi

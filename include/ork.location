@@ -65,7 +65,7 @@ function location_store
    stdout_warning "Scanning nearby BSSIDs. This will take 30 seconds."
 
    for _i in $(seq 30); do
-      iw_dev_scan_simple "$_wifi_interface" | awk -F '|' '{ print $2 }' | awk -F '#' '{ print $2}' >> "$_detect_file"
+      orkhideya-elevate iw_dev_scan_simple "$_wifi_interface" | awk -F '|' '{ print $2 }' | awk -F '#' '{ print $2}' >> "$_detect_file"
       sort -u -o "$_detect_file" "$_detect_file"
       sleep 1
    done
@@ -85,7 +85,7 @@ function location_detect
    stdout_warning "Attempting to detect location via $(stdout_color_wrap main-focused "$_wifi_interface")."
 
    for _i in $(seq 3); do
-      iw_dev_scan_simple "$_wifi_interface" | awk -F '|' '{ print $2 }' | awk -F '#' '{ print $2}' >> "$_scan_tmpfile"
+      orkhideya-elevate iw_dev_scan_simple "$_wifi_interface" | awk -F '|' '{ print $2 }' | awk -F '#' '{ print $2}' >> "$_scan_tmpfile"
       sort -u -o "$_scan_tmpfile" "$_scan_tmpfile"
       sleep 1
    done

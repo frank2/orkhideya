@@ -111,6 +111,9 @@ function stdout_indicator
       "error")
          echo "${ORK_STDOUT_INDICATOR_PREFIX}${ORK_STDOUT_INDICATOR_ERROR}${ORK_STDOUT_INDICATOR_SUFFIX}"
          ;;
+      "debug")
+         echo "${ORK_STDOUT_INDICATOR_PREFIX}${ORK_STDOUT_INDICATOR_DEBUG}${ORK_STDOUT_INDICATOR_SUFFIX}"
+         ;;
       *)
          echo "${ORK_STDOUT_INDICATOR_PREFIX}${ORK_STDOUT_INDICATOR_NORMAL}${ORK_STDOUT_INDICATOR_SUFFIX}"
          ;;
@@ -124,7 +127,10 @@ function stdout_status
    local _status="$1"
    local _message="${@:2}"
 
-   stdout_puts "${ORK_STDOUT_STATUS_PREFIX} $(stdout_indicator $_status) $(stdout_color main-focused "$ORK_STDOUT_STATUS_EXECUTOR")${ORK_STDOUT_STATUS_SUFFIX} $_message"
+   if [ "$_status" != "debug" -o "$_status" == "debug" -a -n "$ORK_DEBUG" ]; then
+      stdout_puts "${ORK_STDOUT_STATUS_PREFIX} $(stdout_indicator $_status) $(stdout_color main-focused "$ORK_STDOUT_STATUS_EXECUTOR")${ORK_STDOUT_STATUS_SUFFIX} $_message"
+   fi
+
    return 0
 }
 
@@ -146,6 +152,13 @@ function stdout_error
 {
    local _message="$@"
    stdout_status error "$_message"
+   return 0
+}
+
+function stdout_debug
+{
+   local _message="$@"
+   stdout_status debug "$_message"
    return 0
 }
 
@@ -214,6 +227,7 @@ ORK_STDOUT_INDICATOR_SUFFIX="$(stdout_color decorative ']')"
 ORK_STDOUT_INDICATOR_NORMAL="$(stdout_color normal '+')"
 ORK_STDOUT_INDICATOR_WARNING="$(stdout_color warning '?')"
 ORK_STDOUT_INDICATOR_ERROR="$(stdout_color attention '!')"
+ORK_STDOUT_INDICATOR_DEBUG="$(stdout_color attention 'D')"
 
 # prompt
 ORK_STDOUT_PROMPT="$(stdout_color_wrap attention '>>')"
