@@ -221,7 +221,6 @@ function iw_ap_best_bssid
    fi
 
    local _ifs="$IFS"
-
    local _tmp_result="$(stdlib_tmpfile)"
 
    for _seq in $(seq 1 5); do
@@ -387,7 +386,7 @@ function iw_dev_scan_simple
    ! if_dev_up "$_dev" && return 2
    [ "$(iw_dev_get_mode "$_dev")" != "managed" ] && return 3 # iwlist needs managed
 
-   _ifs="$IFS"
+   local _ifs="$IFS"
    IFS="
 "
 

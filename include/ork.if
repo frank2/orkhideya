@@ -52,7 +52,22 @@ function if_dev_exists
 
 function if_gateway_interface
 {
-   _gateway="$(netstat -rn | grep '^0.0.0.0' | awk '{ print $8 }')"
+   local _parent_interface="$1"
+
+   if [ -n "$_parent_interface" ]; then
+      ! if_interface_exists "$_parent_interface" && return 1
+
+      local _network="$(if_interface_ipv4_network "$_parent_interface")"
+      [ -z "$_network" ] && return 2 
+
+      local _destination="$(ipv4_cidr_network "$_network")"
+      local _genmask="$(ipv4_cidr_netmask "$_network")"
+   else
+      local _destination="0.0.0.0"
+      local _genmask="0.0.0.0"
+   fi
+
+   _gateway="$(route -n | egrep "^$_destination[[:space:]]+[[:digit:].]+[[:space:]]+$_genmask[[:space:]]+[[:upper:]]*G[[:upper:]]*" | awk '{ print $8 }' | head -n1)"
    [ -z "$_gateway" ] && return 3
 
    echo "$_gateway"

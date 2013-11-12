@@ -1,0 +1,126 @@
+#!/bin/bash
+
+source orkhideya
+ork_include if
+ork_include iw
+ork_include stdlib
+
+function location_root
+{
+   ork_configpath "location"
+   return 0
+}
+
+function location_path
+{
+   local _location="$1"
+   ork_pathcat "$(location_root)" "$ORK_LOCATION_LOCATIONS" "$(stdlib_pathify "$_location")"
+   return 0
+}
+
+function location_exists
+{
+   local _location="$1"
+   test -d "$(location_path "$_location")"
+   return $?
+}
+
+function location_arrive
+{
+   local _location="$1"
+   local _args="${@:2}" 
+   ! location_exists "$_location" && return 1
+
+   local _arrive_file="$(stdlib_filesearch  "$(location_path)" "$(stdlib_pathify "$_location")" 'arrive')"
+   [ -z "$_arrive_file" ] && return 2
+   [ ! -x "$_arrive_file" ] && return 3
+   ! "$_arrive_file" $_args && return 4
+   return 0
+}
+
+function location_leave
+{
+   local _location="$1"
+   local _args="${@:2}" 
+   ! location_exists "$_location" && return 1
+
+   local _leave_file="$(stdlib_filesearch  "$(location_path)" "$(stdlib_pathify "$_location")" 'leave')"
+   [ -z "$_leave_file" ] && return 2
+   [ ! -x "$_leave_file" ] && return 3
+   ! "$_leave_file" $_args && return 4
+   return 0
+}
+
+function location_store
+{
+   local _wifi_interface="$1"
+   ! if_dev_exists "$_wifi_interface" && return 1
+   ! orkhideya-elevate iw_dev_set_mode "$_wifi_interface" managed && return 2
+
+   local _location="$2"
+
+   [ -z "$_location" ] && return 3
+
+   _detect_file="$(stdlib_forcepath "$(location_path "$_location")/detect")"
+   stdout_warning "Scanning nearby BSSIDs. This will take 30 seconds."
+
+   for _i in $(seq 30); do
+      iw_dev_scan_simple "$_wifi_interface" | awk -F '|' '{ print $2 }' | awk -F '#' '{ print $2}' >> "$_detect_file"
+      sort -u -o "$_detect_file" "$_detect_file"
+      sleep 1
+   done
+
+   stdout_normal "Stored $(stdout_color_wrap main-focused "$(cat "$_detect_file" | wc -l)") BSSIDs for $(stdout_color_wrap main-focused "$_location")."
+   return 0
+}
+
+function location_detect
+{
+   local _wifi_interface="$1"
+   ! if_dev_exists "$_wifi_interface" && return 1
+   ! orkhideya-elevate iw_dev_set_mode "$_wifi_interface" managed && return 2
+
+   _scan_tmpfile="$(stdlib_tmpfile location-detection)"
+
+   stdout_warning "Attempting to detect location via $(stdout_color_wrap main-focused "$_wifi_interface")."
+
+   for _i in $(seq 3); do
+      iw_dev_scan_simple "$_wifi_interface" | awk -F '|' '{ print $2 }' | awk -F '#' '{ print $2}' >> "$_scan_tmpfile"
+      sort -u -o "$_scan_tmpfile" "$_scan_tmpfile"
+      sleep 1
+   done
+
+   stdout_normal "Scan completed."
+
+   local _oldifs="$IFS"
+   local _top_hits="0"
+   local _top_detection=""
+   IFS="
+"
+
+   for _detection in $(find "$(location_path)" -type f -name detect); do
+      local _hits="0"
+
+      for _bssid in $(cat "$_detection"); do
+         [ -n "$(grep -o "$_bssid" "$_scan_tmpfile")" ] && _hits="$(($_hits+1))"
+      done
+
+      if [ "$_hits" -gt "$_top_hits" ]; then
+         _top_hits="$_hits"
+         _top_detection="$(echo "$_detection" | sed -e "s,^$(location_path)/,," -e "s,/detect$,," -e 's,/,.,g')"
+      fi
+   done
+
+   shred -u "$_scan_tmpfile"
+   IFS="$_oldifs"
+
+   if [ -n "$_top_detection" ]; then
+      stdout_normal "Detected $(stdout_color_wrap main-focused "$_top_detection") location."
+      echo "$_top_detection"
+   fi
+
+   return 0
+}
+
+ORK_LOCATION_LOCATIONS="locations"
+ork_reconfigure "location"

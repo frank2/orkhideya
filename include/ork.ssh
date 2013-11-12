@@ -18,7 +18,7 @@ function ssh_site_root
 
 function ssh_site_path
 {
-   _site="$1"
+   local _site="$1"
    ork_pathcat "$(ssh_site_root)" "$(stdlib_pathify "$_site")"
    return 0
 }
@@ -31,21 +31,65 @@ function ssh_key_root
 
 function ssh_key_path
 {
-   _site="$1"
+   local _site="$1"
    ork_pathcat "$(ssh_key_root)" "$(stdlib_pathify "$_site")"
+   return 0
+}
+
+function ssh_proxy_root
+{
+   ork_pathcat "$(ork_configpath ssh)" "$ORK_SSH_PROXYPATH"
+   return 0
+}
+
+function ssh_proxy_path
+{
+   local _proxy="$1"
+   ork_pathcat "$(ssh_proxy_root)" "$(stdlib_pathify "$_proxy")"
+   return 0
+}
+
+function ssh_proxy_exists
+{
+   local _proxy="$1"
+   test -d "$(ssh_proxy_path $_proxy)"
+   return $?
+}
+
+function ssh_proxy_file
+{
+   local _proxy="$1"
+   if ! ssh_proxy_exists "$_proxy"; then return 1; fi
+
+   echo "$(ssh_proxy_path $_proxy)/proxy"
+   return 0
+}
+
+function ssh_proxy_connect
+{
+   local _proxy="$1"
+   ! ssh_proxy_exists "$_proxy" && return 1
+
+   local _host="$2"
+   local _port="$3"
+   local _username="$4"
+
+   local _proxy_file="$(ssh_proxy_file "$_proxy")"
+   ! test -x "$_proxy_file" && return 2
+   ! "$_proxy_file" "$_host" "$_port" "$_username" && return 3
    return 0
 }
 
 function ssh_site_exists
 {
-   _site="$1"
+   local _site="$1"
    test -d "$(ssh_site_path $_site)"
    return $?
 }
 
 function ssh_site_config_file
 {
-   _site="$1"
+   local _site="$1"
    if ! ssh_site_exists "$_site"; then return 1; fi
 
    echo "$(ssh_site_path $_site)/config"
@@ -54,7 +98,7 @@ function ssh_site_config_file
 
 function ssh_site_proxy_file
 {
-   _site="$1"
+   local _site="$1"
    if ! ssh_site_exists "$_site"; then return 1; fi
 
    echo "$(ssh_site_path $_site)/proxy"
@@ -64,10 +108,16 @@ function ssh_site_proxy_file
 function ssh_key_file
 {
    # an ssh site can exist without a keyfile, but not the other way around.
-   _site="$1"
+   local _site="$1"
    if ! ssh_site_exists "$_site"; then return 1; fi
+
+   local _key="$2"
+
+   if [ -z "$_key" ]; then
+      _key="$ORK_SSH_KEYFILE"
+   fi
    
-   echo "$(ssh_key_root)/$(stdlib_pathify "$_site")/$ORK_SSH_KEYFILE"
+   echo "$(ssh_key_root)/$(stdlib_pathify "$_site")/$_key"
    return 0
 }
 
@@ -85,7 +135,7 @@ function ssh_site_config_build
    local _site_root="$(ssh_site_root)"
    local _key_root="$(ssh_key_root)"
    local _search_path="$_site_root/$(stdlib_pathify $_site)"
-   local _config_paths=$(for _config_path in $(find $_search_path -type d); do echo $(stdlib_strcount '/' "$_config_path") "$_config_path"; done | sort -g -r | awk '{ print $2 }' | sed -e "s,^$_site_root,,")
+   local _config_paths=$(for _config_path in $(find -L $_search_path -type d); do echo $(stdlib_strcount '/' "$_config_path") "$_config_path"; done | sort -g -r | awk '{ print $2 }' | sed -e "s,^$_site_root,,")
 
    local _ifs="$IFS"
    IFS="
@@ -96,12 +146,14 @@ function ssh_site_config_build
       # was written in a specific way to handle a series of edge-cases.
 
       local _inferred_host="$(stdlib_configify "${_config_path:1}")"
+      local _key_path="$(ssh_key_path "$_inferred_host")"
       local _site_config="$(ssh_site_config_file "$_inferred_host")"
       local _site_proxy="$(ssh_site_proxy_file "$_inferred_host")"
       local _site_key="$(ssh_site_key "$_inferred_host")"
       local _site_host=""
+      local _printed="0"
       
-      if [ -e "$_site_key" -o -e "$_site_proxy" ]; then
+      if [ -e "$_site_key" -o -r "$_site_proxy" ]; then
          _site_host="$_inferred_host"
       fi
 
@@ -127,44 +179,60 @@ function ssh_site_config_build
       if [ -n "$_site_host" -a -z "$_config_host" ]; then
          local _occurrences="$(stdlib_strcount "$_config_path" "$_config_paths")"
 
-         if [ -e "$_site_key" -o -e "$_site_config" -o -e "$_site_proxy" ]; then
+         if [ -e "$_site_key" -o -e "$_site_config" -o -r "$_site_proxy" ]; then
             if [ "$_occurrences" -gt 1 ]; then
                if [ -n "$(test -e "$_site_config" && grep -o -P '^\s*HostName\s+' "$_site_config")" ]; then
                   echo "Host ${_site_host}.* $_site_host"
+                  _printed=1
                else
                   echo "Host ${_site_host}.*"
+                  _printed=1
                fi
             else
                echo "Host $_site_host"
+               _printed=1
             fi
          fi
-      elif [ -z "$_site_host" -a -z "$_config_host" -a \( -n "$(test -e "$_site_config" && cat "$_site_config")" -o -e "$_site_key" -o -e "$_site_proxy" \) ]; then
+      elif [ -z "$_site_host" -a -z "$_config_host" -a \( -n "$(test -e "$_site_config" && cat "$_site_config")" -o -e "$_site_key" -o -r "$_site_proxy" \) ]; then
          echo "Host *"
+         _printed=1
       fi
 
       if [ -n "$(test -e "$_site_config" && cat "$_site_config")" ]; then
          for _line in $(cat "$_site_config"); do
             if ! echo $_line | grep -q -P "^Host\s+"; then
                printf "\t%s\n" "$_line"
+               _printed=1
             else
                printf "%s\n" "$_line"
+               _printed=1
             fi
          done
-
-         printf "\n"
       fi
+
+      for _other_key in $(find "$_key_path" -maxdepth 1 -type f ! -name "*.pub" -a ! -name "$ORK_SSH_KEYFILE" | sed -e "s,^$_key_path/,,g"); do
+         printf "\tIdentityFile %s\n" "$_key_path/$_other_key"
+         _printed=1
+      done
 
       if [ -e "$_site_key" ]; then
-         printf "\tIdentityFile %s\n\n" "$_site_key"
+         printf "\tIdentityFile %s\n" "$_site_key"
+         _printed=1
       fi
 
-      if [ -e "$_site_proxy" ]; then
-         printf "\tProxyCommand %s %%h %%p\n\n" "$_site_proxy"
+      if [ -r "$_site_proxy" ]; then
+         local _proxy_file="$(ssh_proxy_file "$(cat $_site_proxy)")"
+         printf "\tProxyCommand %s %%h %%p %%r\n" "$_proxy_file"
+         _printed=1
       fi
 
       if [ -n "$_executable_config" ]; then
          shred -u "$_executable_output"
          _executable_config=""
+      fi
+
+      if [ "$_printed" == "1" ]; then
+         printf "\n"
       fi
    done
 
@@ -175,7 +243,8 @@ function ssh_site_config_build
 function ssh_site_config_edit
 {
    local _site="$1"
-   if ! ssh_site_exists "$_site"; then return 1; fi
+   if [ -z "$_site" -o "$_site" == "-" ]; then _site=""; 
+   elif ! ssh_site_exists "$_site"; then return 1; fi
 
    local _config_file="$(ssh_site_config_file "$_site")"
 
@@ -215,21 +284,94 @@ function ssh_site_config_save
 function ssh_site_create
 {
    local _site="$1"
-   if ssh_site_exists "$_site"; then return 1; fi
-   if ! mkdir -p "$(ssh_site_path $_site)"; then return 2; fi
+   ssh_site_exists "$_site" &&  return 1
+   ! mkdir -p "$(ssh_site_path $_site)" && return 2
 
    _config_file="$(ssh_site_config_file $_site)"
-   if ! touch "$_config_file"; then return 3; fi
+   ! touch "$_config_file" && return 3
 
    echo "# ORKHiDEYA config for site "$_site"" > "$_config_file"
    stdlib_edit "$_config_file"
    return $?
 }
 
+function ssh_site_rename
+{
+   local _site="$1"
+   ! ssh_site_exists "$_site" && return 1
+
+   local _rename="$2"
+   [ -z "$_rename" ] && return 2
+   ssh_site_exists "$_rename" && return 3
+
+   _site_path="$(ssh_site_path "$_site")"
+   _rename_path="$(ssh_site_path "$_rename")"
+
+   ! mkdir -p "$_rename_path" && return 4
+   ! mv "$_site_path/*" "$_rename_path/" && return 5
+
+   if [ -d "$(ssh_key_path "$_site")" ]; then
+      _site_keys="$(ssh_key_path "$_site")"
+      _rename_keys="$(ssh_key_path "$_rename")"
+
+      ! mkdir -p "$_rename_keys" && return 6
+      ! mv "$_site_keys/*" "$_rename_keys/" && return 7
+   fi
+
+   return 0
+}
+
+function ssh_site_link
+{
+   local _site="$1"
+   ! ssh_site_exists "$_site" && return 1
+
+   local _link="$2"
+   [ -z "$_link" ] && return 2
+   ssh_site_exists "$_link" && return 3
+
+   _site_path="$(ssh_site_path "$_site")"
+   _link_path="$(ssh_site_path "$_link")"
+
+   ! mkdir -p "$_link_path" && return 4
+   ! find "$_site_path" -maxdepth 1 -type f -exec ln -s {} "$_link_path" \; && return 5
+
+   if [ -d "$(ssh_key_path "$_site")" ]; then
+      _site_keys="$(ssh_key_path "$_site")"
+      _link_keys="$(ssh_key_path "$_link")"
+
+      ! mkdir -p "$_link_keys" && return 6
+      ! find "$_site_keys" -maxdepth 1 -type f -exec ln -s {} "$_link_keys" \; && return 7
+   fi
+
+   return 0
+}
+
+function ssh_site_unlink
+{
+   local _site="$1"
+   ! ssh_site_exists "$_site" && return 1
+
+   local _continue="$(stdout_prompt_yesno "Confirm removal of site $(stdout_color_wrap main-focused "$_site") and its corresponding keys.")"
+   test "$_continue" != "y" && return 0
+
+   local _path="$(ssh_site_path "$_site")"
+   ! rm -rf "$_path" && return 2
+   test -d "$(ssh_key_path "$_site")" && ! rm -rf "$(ssh_key_path "$_site")" && return 3
+   return 0
+}
+
+function ssh_site_delete
+{
+   ssh_site_unlink $@
+   return $?
+}
+
 function ssh_key_gen
 {
-   _site="$1"
-   _arguments="${@:2}"
+   local _site="$1"
+   local _key="$2"
+   local _arguments="${@:3}"
 
    if [ "$_site" == "-" ]; then
       stdout_warning "Site argument is blank. This will generate a default key."
@@ -238,12 +380,22 @@ function ssh_key_gen
       return 1
    fi
 
-   _key_file="$(ssh_key_file "$_site")"
-
-   if [ -e "$_key_file" ]; then return 2; fi
+   if [ -z "$_key" -o "$_key" == "-" ]; then
+      _key="$ORK_SSH_KEYFILE"
+   fi
 
    if [ -z "$_arguments" ] || ! echo "$_arguments" | grep -q -P "(^-f|\s+-f)"; then
+      local _key_file="$(ssh_key_file "$_site" "$_key")"
+      stdout_warning "No keyfile specified on the commandline, using default key $(stdout_color_wrap main-focused "$_key_file")."
+
+      if [ -e "$_key_file" ]; then stdout_error "Key already exists"; return 2; fi
+
       _arguments="$_arguments -f "$_key_file""
+   fi
+
+   if [ -z "$_arguments" ] || ! echo "$_arguments" | grep -q -P "(^-t|\s+-t)"; then
+      stdout_warning "No key type specified on the commandline. Using ECDSA by default."
+      _arguments="$_arguments -t "ecdsa""
    fi
 
    if [ ! -d "$(ssh_key_path "$_site")" ]; then
@@ -266,11 +418,15 @@ function ssh_key_gen
 function ssh_key_select
 {
    local _site="$1"
-   local _keys="$(ssh_site_keys "$_site")"
+   local _key="$2"
 
-   if [ "$?" != "0" ]; then return 1; fi
+   if [ -z "$_key" ]; then
+      _key="$ORK_SSH_KEYFILE"
+   fi
+   
+   local _keys="$(ssh_site_keys "$_site" "$_key")"
+   if [ "$?" != "0" ]; then return 2; fi
 
-   local _key=""
    local _keycount="$(stdlib_strcount ':' "$_keys")"
 
    if [ "$_keycount" -gt "0" ]; then
@@ -313,9 +469,9 @@ function ssh_key_exchange
    local _key="$2"
    
    if [ -z "$_key" ]; then
-      _key="$(ssh_key_select "$_site").pub"
+      _key="$(ssh_key_select "$_site" "$ORK_SSH_KEYFILE").pub"
    else
-      _key="$(ssh_key_select "$_key").pub"
+      _key="$(ssh_key_select "$_site" "$_key").pub"
    fi
 
    local _remote_ssh_config="$3"
@@ -353,13 +509,18 @@ function ssh_site_list
 function ssh_site_key
 {
    local _site="$1"
+   local _key="$2"
+
+   if [ -z "$_key" ]; then
+      _key="$ORK_SSH_KEYFILE"
+   fi
 
    if [ "$_site" == "-" ]; then
       stdout_warning "Site argument is blank. This will only return the root key."
       _site=""
    fi
 
-   local _keyfile="$(ssh_key_file $_site)"
+   local _keyfile="$(ssh_key_file "$_site" "$_key")"
 
    if [ ! -r "$_keyfile" ]; then return 1; fi
    echo $_keyfile | sed -r -e 's,/+,/,g'
@@ -369,6 +530,11 @@ function ssh_site_key
 function ssh_site_keys
 {
    local _site="$1"
+   local _keyname="$2"
+
+   if [ -z "$_keyname" ]; then
+      _keyname="$ORK_SSH_KEYFILE"
+   fi
 
    if [ "$_site" == "-" ]; then
       stdout_warning "Site argument is blank. This will only return the root key."
@@ -384,7 +550,7 @@ function ssh_site_keys
    while : ; do
       if [ -n "$_root_key" ]; then break; fi
       if [ -z "$_keypath" ]; then local _root_key="1"; fi
-      local _keyfile="$(ssh_site_key "$(stdlib_configify "$_keypath")" 2>/dev/null)"
+      local _keyfile="$(ssh_site_key "$(stdlib_configify "$_keypath")" "$_keyname" 3>/dev/null)"
 
       if [ -n "$_keyfile" ]; then
          if [ -z "$_keys" ]; then
@@ -402,6 +568,7 @@ function ssh_site_keys
 }
 
 ORK_SSH_SSHCONFIG="$HOME/.ssh"
-ORK_SSH_KEYFILE="id_rsa"
+ORK_SSH_KEYFILE="id_ecc"
 ORK_SSH_SITEPATH="sites"
 ORK_SSH_KEYPATH="keys"
+ORK_SSH_PROXYPATH="proxies"
