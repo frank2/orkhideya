@@ -5,25 +5,7 @@ ork_include stdlib
 ork_include stdout
 
 if [ "$(id -u)" != "0" ]; then
-   _informer="$(stdlib_tmpfile inform-root-required)"
-
-   if [ ! -e "$_informer" ]; then
-      stdout_warning Root is required to continue.
-      echo 1 > "$_informer"
-   else
-      _informed="$(cat "$_informer")"
-      echo $(($_informed+1)) > "$_informer"
-   fi
-
-   sudo -E -- "$0" "$@" 
-   _status="$?"
-   _informed="$(cat "$_informer")"
-
-   if [ "$_informed" == "1" ]; then
-      shred -u "$_informer"
-   else
-      echo $(($_informed-1)) > "$_informer"
-   fi
-
-   exit $_status
+   stdout_debug "Elevating "$0""
+   sudo -E -p "$(color_render "$(stdout_inform warning Root is required to continue.)"; printf '%s ' "$(color_render $ORK_STDOUT_PROMPT)")" -- "$0" "$@" 
+   exit $?
 fi

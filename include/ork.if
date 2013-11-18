@@ -163,8 +163,8 @@ function if_interface_is_up
    local _interface="$1"
 
    ! if_interface_exists "$_interface" && return 1
-   ifconfig | tail -n+2 | grep -q "^${_interface}:"
-   return $?
+   [ -z "$(ifconfig | grep "^$_interface:")" ] && return 2
+   return 0
 }
 
 function if_interface_is_down
@@ -331,9 +331,9 @@ function if_dev_is_up
    local _interface="$(if_dev_interface "$_device")"
    [ -z "$_interface" ] && return 2
    ! if_interface_exists "$_interface" && return 3
+   ! if_interface_is_up "$_interface" && return 4
 
-   if_interface_is_up "$_interface"
-   return $?
+   return 0
 }
 
 function if_dev_is_down
@@ -472,7 +472,7 @@ function if_dev_postdown
 
 function if_dev_ether_get
 {
-   local _devive="$1"
+   local _device="$1"
    ! if_dev_exists "$_device" && return 1
 
    local _interface="$(if_dev_interface "$_device")"
@@ -483,7 +483,7 @@ function if_dev_ether_get
 
 function if_dev_ether_set
 {
-   local _devive="$1"
+   local _device="$1"
    ! if_dev_exists "$_device" && return 1
 
    local _interface="$(if_dev_interface "$_device")"

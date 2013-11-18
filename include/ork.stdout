@@ -122,13 +122,22 @@ function stdout_indicator
    return 0
 }
 
+function stdout_inform
+{
+   local _status="$1"
+   local _message="${@:2}"
+   
+   echo "${ORK_STDOUT_STATUS_PREFIX} $(stdout_indicator $_status) $(stdout_color main-focused "$ORK_STDOUT_STATUS_EXECUTOR")${ORK_STDOUT_STATUS_SUFFIX} $_message"
+   return 0
+}
+
 function stdout_status
 {
    local _status="$1"
    local _message="${@:2}"
 
    if [ "$_status" != "debug" -o "$_status" == "debug" -a -n "$ORK_DEBUG" ]; then
-      stdout_puts "${ORK_STDOUT_STATUS_PREFIX} $(stdout_indicator $_status) $(stdout_color main-focused "$ORK_STDOUT_STATUS_EXECUTOR")${ORK_STDOUT_STATUS_SUFFIX} $_message"
+      stdout_puts "$(stdout_inform $_status $_message)"
    fi
 
    return 0
