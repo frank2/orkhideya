@@ -572,3 +572,5 @@ ORK_SSH_KEYFILE="id_ecc"
 ORK_SSH_SITEPATH="sites"
 ORK_SSH_KEYPATH="keys"
 ORK_SSH_PROXYPATH="proxies"
+
+ork_reconfigure ssh

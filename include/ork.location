@@ -35,12 +35,21 @@ function location_arrive
    [ -z "$_arrive_file" ] && return 2
    [ ! -x "$_arrive_file" ] && return 3
    ! "$_arrive_file" $_args && return 4
+
+   echo "$_location" > "$(stdlib_tmpfile current-location)"
    return 0
 }
 
 function location_leave
 {
    local _location="$1"
+   local _location_file="$(stdlib_tmpfile current-location)"
+
+   if [ -z "$_location" -o "$_location" == "-" ]; then
+      ! test -r "$_location_file" && return 1
+      _location="$(cat "$_location_file")"
+   fi
+
    local _args="${@:2}" 
    ! location_exists "$_location" && return 1
 
@@ -48,6 +57,11 @@ function location_leave
    [ -z "$_leave_file" ] && return 2
    [ ! -x "$_leave_file" ] && return 3
    ! "$_leave_file" $_args && return 4
+
+   if [ -e "$_location_file" ]; then
+      shred -u "$_location_file"
+   fi
+
    return 0
 }
 
@@ -94,22 +108,72 @@ function location_detect
 
    local _oldifs="$IFS"
    local _top_hits="0"
+   local _top_ratio="0"
+   local _top_hit_location=""
+   local _top_ratio_location=""
    local _top_detection=""
    IFS="
 "
 
    for _detection in $(find "$(location_path)" -type f -name detect); do
       local _hits="0"
+      local _total_hits="0"
+      local _detection_name="$(echo "$_detection" | sed -e "s,^$(location_path)/,," -e "s,/detect$,," -e 's,/,.,g')"
 
       for _bssid in $(cat "$_detection"); do
          [ -n "$(grep -o "$_bssid" "$_scan_tmpfile")" ] && _hits="$(($_hits+1))"
+         _total_hits="$(($_total_hits+1))"
       done
+
+      stdout_normal "$(stdout_color_wrap main-focused "$_detection") got $(stdout_color_wrap attention "$_hits")/$(stdout_color_wrap main-focused "$_total_hits") hit(s)."
 
       if [ "$_hits" -gt "$_top_hits" ]; then
          _top_hits="$_hits"
-         _top_detection="$(echo "$_detection" | sed -e "s,^$(location_path)/,," -e "s,/detect$,," -e 's,/,.,g')"
+         _top_hit_location="$_detection_name"
+      fi
+
+      local _ratio="$(echo "scale=3;($_hits/$_total_hits)*100" | bc | awk -F '.' '{ print $1 }')"
+
+      if [ "$_ratio" -gt "$_top_ratio" ]; then
+         _top_ratio="$_ratio"
+         _top_ratio_location="$_detection_name"
       fi
    done
+
+   if [ -z "$_top_hit_location" ]; then
+      _top_detection="$_top_ratio_location"
+   elif [ -z "$_top_ratio_location" ]; then
+      _top_detection="$_top_hit_location"
+   elif [ "$_top_ratio_location" == "$_top_hit_location" ]; then
+      _top_detection="$_top_hit_location"
+   else
+      local _ratio_preference_file="$(location_path "$_top_ratio_location")/prefer"
+      local _hit_preference_file="$(location_path "$_top_hit_location")/prefer"
+      local _ratio_preference="none"
+      local _hit_preference="none"
+
+      if [ -r "$_ratio_preference_file" ]; then
+         _ratio_preference="$(cat "$_ratio_preference_file")"
+      fi
+
+      if [ -r "$_hit_preference_file" ]; then
+         _hit_preference="$(cat "$_hit_preference_file")"
+      fi
+
+      if [ "$_hit_preference" == "none" -a "$_ratio_preference" == "none" ]; then
+         _top_detection="$_top_ratio_location"
+      elif [ "$_hit_preference" == "ratio" ]; then
+         _top_detection="$_top_ratio_location"
+      elif [ "$_ratio_preference" == "hits" ]; then
+         _top_detection="$_top_hit_location"
+      elif [ "$_hit_preference" == "hits" -a "$_ratio_preference" == "ratio" ]; then
+         if [ "$(wc -l "$(location_path "$_top_ratio_location")/detect" | awk '{ print $1 }')" -gt "$_top_hits" ]; then
+            _top_detection="$_top_ratio_location"
+         else
+            _top_detection="$_top_hit_location"
+         fi
+      fi
+   fi
 
    shred -u "$_scan_tmpfile"
    IFS="$_oldifs"

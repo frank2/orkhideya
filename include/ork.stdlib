@@ -182,3 +182,5 @@ function stdlib_tmpfile
    echo "$(ork_pathroot "tmp")/$_label"
    return 0
 }
+
+ork_reconfigure stdlib
