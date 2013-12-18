@@ -217,12 +217,14 @@ ORK_STDOUT_COLOR_MAIN_FOCUSED="$(color_fg lightpurple)"
 ORK_STDOUT_COLOR_MAIN_UNFOCUSED="$(color_fg purple)"
 ORK_STDOUT_COLOR_DESPERATE="$(color_fg lightcyan)"
 
+ORK_STDOUT_SYSTEM_NAME="$(stdout_color main 'ORKH')"
+ORK_STDOUT_SYSTEM_NAME="${ORK_STDOUT_SYSTEM_NAME}$(stdout_color attention 'i')"
+ORK_STDOUT_SYSTEM_NAME="${ORK_STDOUT_SYSTEM_NAME}$(stdout_color main 'DEYA')"
+
 # status prefix and suffix
 ORK_STDOUT_STATUS_PREFIX="$(stdout_color normal ']')"
 ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX}$(stdout_color warning ']')"
-ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX} $(stdout_color main 'ORKH')"
-ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX}$(stdout_color attention 'i')"
-ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX}$(stdout_color main 'DEYA')"
+ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX} ${ORK_STDOUT_SYSTEM_NAME}"
 ORK_STDOUT_STATUS_PREFIX="${ORK_STDOUT_STATUS_PREFIX}$(stdout_color decorative ']')"
 
 ORK_STDOUT_STATUS_EXECUTOR="$(echo $0 | awk -F '/' '{ print $NF }')"

@@ -1,0 +1,178 @@
+#!/bin/bash
+
+_exec_path="${0%%/${0##*/}}" # one of those weird old tricks from @twopir
+
+ORK_ROOT="$(realpath $_exec_path)"
+source "$_exec_path/bin/orkhideya" || ( echo "bootstrap failed" 1>&2 && exit 1 )
+ork_include stdout
+ork_include stdlib
+
+_quick_install="$1"
+
+function folder_verify
+{
+   local _path="$1"
+
+   if [ -z "$_path" ]; then
+      stdout_error "No path provided."
+      exit 6
+   fi
+
+   if [ ! -d "$_path" ]; then 
+      stdout_warning "Creating $(stdout_color_wrap main-focused "$_path")."
+      mkdir -p "$_path"
+
+      if [ "$?" != "0" ]; then
+         stdout_error "Folder creation failed."
+         exit 3
+      fi
+   fi
+
+   return 0
+}
+
+function path_configure
+{
+   local _ork_label="$1"
+   local _var_label="$2"
+   local _prompt_label="$3"
+
+   local _installer_path="$(ork_pathroot "$_ork_label")"
+   local _new_root_path=""
+
+   while [ -z "$_new_root_path" ]; do
+      _new_root_path="$(stdout_prompt "$_prompt_label [default: $(ork_pathroot $_ork_label)]")"
+
+      if [ -d "$_new_root_path" ]; then
+         _use="$(stdout_prompt_yesno "$(stdout_color_wrap main-focused "$_new_root_path") already exists. Are you sure you want to use this directory?")"
+
+         if [ "$_use" == "n" ]; then
+            stdout_error "Rejecting $(stdout_color_wrap main-focused "$_new_root_path")."
+            _new_root_path=""
+         fi
+      fi
+
+      if [ -z "$_new_root_path" ]; then
+         stdout_warning "Using default path for $(stdout_color_wrap main-focused "$_ork_label")."
+         _new_root_path="$_installer_path"
+      fi
+   done
+
+   if [ -n "$_new_root_path" -a "$_new_root_path" != "$_installer_path" ]; then
+      export INSTALL_${_var_label}="$_new_root_path"
+   fi
+
+   return 0
+}
+
+if [ -z "$_quick_install" ]; then
+   stdout_normal "Welcome to ${ORK_STDOUT_SYSTEM_NAME}!"
+   stdout_normal "This installer will configure your system to use the orkhideya framework."
+   stdout_normal "To function, a series of folders need to be set up. This will step you through the process."
+   stdout_normal "Other than the root path, if the path name does not begin with a /, it is assumed to be relative to the root."
+
+   while [ -z "$_configured" ]; do
+      path_configure root ORK_ROOT "Root path"
+      #path_configure etc-global ORK_ETC_GLOBAL "Global configuration path"
+      path_configure etc-local ORK_ETC_LOCAL "Local configuration path"
+      path_configure bin ORK_BIN "${ORK_STDOUT_SYSTEM_NAME} executable path"
+      path_configure path ORK_INCLUDE "${ORK_STDOUT_SYSTEM_NAME} include directory"
+      path_configure var ORK_VAR "${ORK_STDOUT_SYSTEM_NAME} var directory"
+      path_configure tmp ORK_TMP "${ORK_STDOUT_SYSTEM_NAME} tmp directory"
+
+      _keep="$(stdout_prompt_yesno "Keep these folder settings?")"
+
+      if [ "$_keep" == "n" ]; then
+         stdout_error "Rejecting settings and trying again."
+      else
+         _configured=1
+      fi
+   done
+
+   _config_file="$HOME/.orkhideya"
+
+   if [ -e "$HOME/.orkhideya" ]; then
+      _overwrite_settings="$(stdout_prompt_yesno "${ORK_STDOUT_SYSTEM_NAME} already exists. Overwrite?")"
+
+      if [ "$_overwrite_settings" == "n" ]; then
+         _new_location="$(stdout_prompt_yesno "Pff, fine. Put it somewhere else then?")"
+
+         if [ "$_new_location" == "n" ]; then
+            stdout_error "Well thanks a lot for wasting my time with the configuration, buster!"
+            exit 2
+         fi
+
+         _config_file=""
+
+         while [ -z "$_config_file" ]; do
+            _config_file="$(stdout_prompt "What's the new filename?")"
+
+            if [ -e "$_config_file" ]; then
+               _overwrite_settings="$(stdout_prompt_yesno "Oh jeez. That file exists too! Overwrite THAT?")"
+
+               if [ "$_overwrite_settings" == "n" ]; then
+                  stdout_error "Get your shit together!"
+                  _config_file=""
+                  continue
+               fi
+            fi
+         done
+      fi
+   fi
+cat - > "$_config_file" <<EOF
+#/bin/bash
+
+ORK_ROOT="$INSTALL_ORK_ROOT"
+ORK_ETC_LOCAL="$INSTALL_ORK_ETC_LOCAL"
+ORK_BIN="$INSTALL_ORK_BIN"
+ORK_VAR="$INSTALL_ORK_VAR"
+ORK_TMP="$INSTALL_ORK_TMP"
+ORK_INCLUDE="$INSTALL_ORK_INCLUDE"
+EOF
+else
+   source "$_quick_install" || ( stdout_error "Failed to source quick-install script." && exit 5 )
+fi
+
+folder_verify "$INSTALL_ORK_ROOT"
+folder_verify "$INSTALL_ORK_ETC_LOCAL"
+folder_verify "$INSTALL_ORK_BIN"
+folder_verify "$INSTALL_ORK_VAR"
+folder_verify "$INSTALL_ORK_TMP"
+folder_verify "$INSTALL_ORK_INCLUDE"
+
+if [ "${INSTALL_ORK_BIN:0:1}" == "/" ]; then
+   _bin_path="$INSTALL_ORK_BIN"
+else
+   _bin_path="$INSTALL_ORK_ROOT/$INSTALL_ORK_BIN"
+fi
+
+stdout_warning "Copying $_exec_path/bin to $(stdout_color_wrap main-focused "$_bin_path")."
+cp -r "$_exec_path/bin/"* "$_bin_path"
+
+if [ "$?" != "0" ]; then
+   stdout_error "Copying failed."
+   exit 4
+fi
+
+if [ "${INSTALL_ORK_INCLUDE:0:1}" == "/" ]; then
+   _include_path="$INSTALL_ORK_INCLUDE"
+else
+   _include_path="$INSTALL_ORK_ROOT/$INSTALL_ORK_INCLUDE"
+fi
+
+stdout_warning "Copying $_exec_path/include to $(stdout_color_wrap main-focused "$_include_path")."
+cp -r "$_exec_path/include/"* "$_include_path"
+
+if [ "$?" != "0" ]; then
+   stdout_error "Copying failed."
+   exit 5
+fi
+
+stdout_normal "${ORK_STDOUT_SYSTEM_NAME} successfully installed!"
+
+if [ -n "$_quick_install" ]; then
+   cp "$_quick_install" "$HOME/.orkhideya"
+   sed -i -e 's,INSTALL_,,g' "$HOME/.orkhideya"
+fi
+
+exit 0
