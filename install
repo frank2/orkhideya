@@ -2,7 +2,10 @@
 
 _exec_path="${0%%/${0##*/}}" # one of those weird old tricks from @twopir
 
-export ORK_ROOT="$(realpath $_exec_path)"
+pushd "$_exec_path" >/dev/null
+export ORK_ROOT="$(pwd -P)"
+popd >/dev/null
+
 source "$_exec_path/bin/orkhideya" || ( echo "bootstrap failed" 1>&2 && exit 1 )
 ork_include stdout || ( echo "bootstrap failed" 1>&2 && exit 1 )
 ork_include stdlib || ( echo "bootstrap failed" 1>&2 && exit 1 )
