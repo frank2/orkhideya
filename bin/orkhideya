@@ -185,23 +185,50 @@ function ork_include
 
 # ascii tbd
 # modify this variable if you care about where things go
-ORK_ROOT="/usr/local/lib/orkhideya"
-
-# modify these variables if you care a lot more about where things go
-ORK_ETC_GLOBAL="etc"
-ORK_ETC_LOCAL="$HOME/local/etc/orkhideya"
-ORK_BIN="bin"
-ORK_VAR="var"
-ORK_TMP="tmp"
-ORK_INCLUDE="include"
-
-# allow these base variables to be overwritten by the system or user
-if [ -r "/etc/orkhideya/config" ]; then
-   source /etc/orkhideya/config
+if [ -z "$ORK_ROOT" ]; then
+   ORK_ROOT="/usr/local/lib/orkhideya"
 fi
 
-if [ -f "$HOME/.orkhideya" -a -r "$HOME/.orkhideya" ]; then
-   source "$HOME/.orkhideya"
+# modify these variables if you care a lot more about where things go
+if [ -z "$ORK_ETC_GLOBAL" ]; then
+   ORK_ETC_GLOBAL="etc"
+fi
+
+if [ -z "$ORK_ETC_LOCAL" ]; then
+   ORK_ETC_LOCAL="$HOME/local/etc/orkhideya"
+fi
+
+if [ -z "$ORK_BIN" ]; then
+   ORK_BIN="bin"
+fi
+
+if [ -z "$ORK_VAR" ]; then
+   ORK_VAR="var"
+fi
+
+if [ -z "$ORK_TMP" ]; then
+   ORK_TMP="tmp"
+fi
+
+if [ -z "$ORK_INCLUDE" ]; then
+   ORK_INCLUDE="include"
+fi
+
+if [ -z "$ORK_CONFIG_GLOBAL" ]; then
+   ORK_CONFIG_GLOBAL="/etc/orkhideya/config"
+fi
+
+if [ -z "$ORK_CONFIG_LOCAL" ]; then
+   ORK_CONFIG_LOCAL="$HOME/.orkhideya"
+fi
+
+# allow these base variables to be overwritten by the system or user
+if [ -r "$ORK_CONFIG_GLOBAL" ]; then
+   source "$ORK_CONFIG_GLOBAL"
+fi
+
+if [ -f "$ORK_CONFIG_LOCAL" -a -r "$ORK_CONFIG_LOCAL" ]; then
+   source "$ORK_CONFIG_LOCAL"
 fi
 
 # make sure the root path is in the orkhideya path 
