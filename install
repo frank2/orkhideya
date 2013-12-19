@@ -46,18 +46,16 @@ function path_configure
    while [ -z "$_new_root_path" ]; do
       _new_root_path="$(stdout_prompt "$_prompt_label [default: $(ork_pathroot $_ork_label)]")"
 
-      if [ -d "$_new_root_path" ]; then
+      if [ -z "$_new_root_path" ]; then
+         stdout_warning "Using default path for $(stdout_color_wrap main-focused "$_ork_label")."
+         _new_root_path="$_installer_path"
+      elif [ -d "$_new_root_path" ]; then
          _use="$(stdout_prompt_yesno "$(stdout_color_wrap main-focused "$_new_root_path") already exists. Are you sure you want to use this directory?")"
 
          if [ "$_use" == "n" ]; then
             stdout_error "Rejecting $(stdout_color_wrap main-focused "$_new_root_path")."
             _new_root_path=""
          fi
-      fi
-
-      if [ -z "$_new_root_path" ]; then
-         stdout_warning "Using default path for $(stdout_color_wrap main-focused "$_ork_label")."
-         _new_root_path="$_installer_path"
       fi
    done
 
