@@ -73,6 +73,7 @@ if [ -z "$_quick_install" ]; then
    stdout_normal "This installer will configure your system to use the orkhideya framework."
    stdout_normal "To function, a series of folders need to be set up. This will step you through the process."
    stdout_normal "Other than the root path, if the path name does not begin with a /, it is assumed to be relative to the root."
+   INSTALL_LINK="$(stdout_prompt_yesno Would you like to link the files instead of copying them?)"
 
    while [ -z "$_configured" ]; do
       path_configure root ORK_ROOT "Root path"
@@ -136,6 +137,10 @@ else
    source "$_quick_install" || ( stdout_error "Failed to source quick-install script." && exit 5 )
 fi
 
+if [ -z "$INSTALL_LINK" ]; then
+   INSTALL_LINK="n"
+fi
+
 folder_verify "$INSTALL_ORK_ROOT"
 folder_verify "$INSTALL_ORK_ETC_LOCAL"
 folder_verify "$INSTALL_ORK_BIN"
@@ -149,12 +154,28 @@ else
    _bin_path="$INSTALL_ORK_ROOT/$INSTALL_ORK_BIN"
 fi
 
-stdout_warning "Copying $_exec_path/bin to $(stdout_color_wrap main-focused "$_bin_path")."
-cp -r "$_exec_path/bin/"* "$_bin_path"
+if [ "$INSTALL_LINK" == "y" ]; then
+   for _file in $(ls "$_exec_path/bin"); do
+      if [ "$_exec_path/bin/$_file" == "$_bin_path/$_file" ]; then
+         continue
+      fi
 
-if [ "$?" != "0" ]; then
-   stdout_error "Copying failed."
-   exit 4
+      stdout_warning "Linking $(stdout_color_wrap main-focused "$_exec_path/bin/$_file") to $(stdout_color_wrap main-focused "$_bin_path/$_file")."
+      ln -s "$_exec_path/bin/$_file" "$_bin_path/$_file"
+
+      if [ "$?" != "0" ]; then
+         stdout_error "Linking failed."
+         exit 4
+      fi
+   done
+else
+   stdout_warning "Copying $_exec_path/bin to $(stdout_color_wrap main-focused "$_bin_path")."
+   cp -r "$_exec_path/bin/"* "$_bin_path"
+
+   if [ "$?" != "0" ]; then
+      stdout_error "Copying failed."
+      exit 4
+   fi
 fi
 
 if [ "${INSTALL_ORK_INCLUDE:0:1}" == "/" ]; then
@@ -163,12 +184,28 @@ else
    _include_path="$INSTALL_ORK_ROOT/$INSTALL_ORK_INCLUDE"
 fi
 
-stdout_warning "Copying $_exec_path/include to $(stdout_color_wrap main-focused "$_include_path")."
-cp -r "$_exec_path/include/"* "$_include_path"
+if [ "$INSTALL_LINK" == "y" ]; then
+   for _file in $(ls "$_exec_path/bin"); do
+      if [ "$_exec_path/include/$_file" == "$_include_path/$_file" ]; then
+         continue
+      fi
 
-if [ "$?" != "0" ]; then
-   stdout_error "Copying failed."
-   exit 5
+      stdout_warning "Linking $(stdout_color_wrap main-focused "$_exec_path/include/$_file") to $(stdout_color_wrap main-focused "$_include_path/$_file")."
+      ln -s "$_exec_path/include/$_file" "$_include_path/$_file"
+
+      if [ "$?" != "0" ]; then
+         stdout_error "Linking failed."
+         exit 5
+      fi
+   done
+else
+   stdout_warning "Copying $_exec_path/include to $(stdout_color_wrap main-focused "$_include_path")."
+   cp -r "$_exec_path/include/"* "$_include_path"
+
+   if [ "$?" != "0" ]; then
+      stdout_error "Copying failed."
+      exit 5
+   fi
 fi
 
 stdout_normal "${ORK_STDOUT_SYSTEM_NAME} successfully installed!"
