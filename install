@@ -59,10 +59,7 @@ function path_configure
       fi
    done
 
-   if [ -n "$_new_root_path" -a "$_new_root_path" != "$_installer_path" ]; then
-      export INSTALL_${_var_label}="$_new_root_path"
-   fi
-
+   export INSTALL_${_var_label}="$_new_root_path"
    return 0
 }
 
