@@ -2,8 +2,10 @@
 
 _exec_path="${0%%/${0##*/}}"
 pushd "$_exec_path" >/dev/null
-export ORK_ROOT="$(pwd -P)"
+_exec_path="$(pwd -P)"
 popd >/dev/null
+
+export ORK_ROOT="$_exec_path"
 PATH="$PATH:$_exec_path/bin"
 
 source orkhideya
@@ -91,7 +93,7 @@ if [ -z "$_quick_install" ]; then
    _config_file="$HOME/.orkhideya"
 
    if [ -e "$HOME/.orkhideya" ]; then
-      _overwrite_settings="$(stdout_prompt_yesno "${ORK_STDOUT_SYSTEM_NAME} already exists. Overwrite?")"
+      _overwrite_settings="$(stdout_prompt_yesno "${ORK_STDOUT_SYSTEM_NAME}$(stdout_color terminate) already exists. Overwrite?")"
 
       if [ "$_overwrite_settings" == "n" ]; then
          _new_location="$(stdout_prompt_yesno "Pff, fine. Put it somewhere else then?")"
@@ -156,7 +158,7 @@ if [ "$INSTALL_LINK" == "y" ]; then
       fi
 
       stdout_warning "Linking $(stdout_color_wrap main-focused "$_exec_path/bin/$_file") to $(stdout_color_wrap main-focused "$_bin_path/$_file")."
-      ln -s "$_exec_path/bin/$_file" "$_bin_path/$_file"
+      ln -s "$_exec_path/bin/$_file" "$ORK_ROOT/bin/$_file"
 
       if [ "$?" != "0" ]; then
          stdout_error "Linking failed."
