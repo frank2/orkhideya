@@ -15,10 +15,10 @@ _quick_install="$1"
 function folder_verify
 {
    local _path="$1"
+   local _default="$2"
 
    if [ -z "$_path" ]; then
-      stdout_error "No path provided."
-      exit 6
+      _path="$_default"
    fi
 
    if [ ! -d "$_path" ]; then 
@@ -136,12 +136,12 @@ if [ -z "$INSTALL_LINK" ]; then
    INSTALL_LINK="n"
 fi
 
-folder_verify "$INSTALL_ORK_ROOT"
-folder_verify "$INSTALL_ORK_ETC_LOCAL"
-folder_verify "$INSTALL_ORK_BIN"
-folder_verify "$INSTALL_ORK_VAR"
-folder_verify "$INSTALL_ORK_TMP"
-folder_verify "$INSTALL_ORK_INCLUDE"
+folder_verify "$INSTALL_ORK_ROOT" "$ORK_ROOT"
+folder_verify "$INSTALL_ORK_ETC_LOCAL" "$ORK_ETC_LOCAL"
+folder_verify "$INSTALL_ORK_BIN" "$ORK_BIN"
+folder_verify "$INSTALL_ORK_VAR" "$ORK_VAR"
+folder_verify "$INSTALL_ORK_TMP" "$ORK_TMP"
+folder_verify "$INSTALL_ORK_INCLUDE" "$ORK_INCLUDE"
 
 if [ "${INSTALL_ORK_BIN:0:1}" == "/" ]; then
    _bin_path="$INSTALL_ORK_BIN"
