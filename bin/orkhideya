@@ -133,7 +133,7 @@ function ork_include
       for _path in $ORK_PATH; do
          IFS="$_ifs"
 
-         for _file in $(find "$_path/" -name "ork.*" -type f -o -type -l); do
+         for _file in $(find "$_path/" -name "ork.*" -type f -o -type l); do
             local _library="$(echo $_file | awk -F '/' '{ print $NF }' | sed -e 's/^ork\.//g')"
 
             # root is the only exception. it serves a special purpose.
