@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# this is a default quickinstall script if you seriously give that little a fuck
+# ./install quick to perform.
+
+INSTALL_LINK="y"
+INSTALL_ORK_BIN="$HOME/local/bin"
+INSTALL_ORK_INCLUDE="$HOME/local/lib/orkhideya"
+INSTALL_ORK_VAR="$HOME/local/var"
+
+if [ ! -e "$HOME/local/tmp" ]; then
+   mkdir -p "$HOME/local"
+   ln -s /tmp "$HOME/local/tmp"
+   INSTALL_ORK_TMP="$HOME/local/tmp"
+fi
