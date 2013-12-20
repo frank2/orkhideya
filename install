@@ -15,6 +15,11 @@ _quick_install="$1"
 function folder_verify
 {
    local _path="$1"
+   local _default="$2"
+
+   if [ -z "$_path" ]; then
+      _path="$_default"
+   fi
 
    if [ ! -d "$_path" ]; then 
       stdout_warning "Creating $(stdout_color_wrap main-focused "$_path")."
