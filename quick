@@ -11,5 +11,6 @@ INSTALL_ORK_VAR="$HOME/local/var"
 if [ ! -e "$HOME/local/tmp" ]; then
    mkdir -p "$HOME/local"
    ln -s /tmp "$HOME/local/tmp"
-   INSTALL_ORK_TMP="$HOME/local/tmp"
 fi
+
+INSTALL_ORK_TMP="$HOME/local/tmp"
