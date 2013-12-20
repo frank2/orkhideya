@@ -158,7 +158,7 @@ if [ "$INSTALL_LINK" == "y" ]; then
       fi
 
       stdout_warning "Linking $(stdout_color_wrap main-focused "$_exec_path/bin/$_file") to $(stdout_color_wrap main-focused "$_bin_path/$_file")."
-      ln -s "$_exec_path/bin/$_file" "$ORK_ROOT/bin/$_file"
+      ln -s "$_exec_path/bin/$_file" "$_bin_path/$_file"
 
       if [ "$?" != "0" ]; then
          stdout_error "Linking failed."
