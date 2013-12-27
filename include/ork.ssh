@@ -210,7 +210,7 @@ function ssh_site_config_build
          done
       fi
 
-      for _other_key in $(find "$_key_path" -maxdepth 1 -type f ! -name "*.pub" -a ! -name "$ORK_SSH_KEYFILE" | sed -e "s,^$_key_path/,,g"); do
+      for _other_key in $(find -L "$_key_path" -maxdepth 1 ! -type d -a \( -type f -o -links +1 \) -a ! -name "*.pub" -a ! -name "$ORK_SSH_KEYFILE" | sed -e "s,^$_key_path/,,g"); do
          printf "\tIdentityFile %s\n" "$_key_path/$_other_key"
          _printed=1
       done
