@@ -85,6 +85,7 @@ function ipv4_cidr_mask
    echo "$_cidr" | awk -F '/' '{ print $2 }'
    return 0
 }
+
 function ipv4_cidr_netmask
 {
    local _cidr="$1"

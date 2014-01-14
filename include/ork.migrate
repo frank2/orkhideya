@@ -21,7 +21,7 @@ function migrate_tarball_file
    local _label="$1"
    if [ -z "$_label" ]; then _label="$ORK_MIGRATE_DEFAULT_LABEL"; fi
 
-   echo "$(migrate_tarball_root)/$_label.tar"
+   echo "$(migrate_tarball_root)/${_label}.tar"
    return 0
 }
 

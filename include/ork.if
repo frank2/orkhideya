@@ -74,6 +74,21 @@ function if_gateway_interface
    return 0
 }
 
+function if_gateways
+{
+   route -n | awk '{ print $4,$8 }' | grep '^[[:upper:]]*G[[:upper:]]*' | awk '{ print $2 }' | sort -u
+   return $?
+}
+
+function if_gateway_networks
+{
+   for _gateway in $(if_gateways); do
+      if_interface_ipv4_network "$_gateway"
+   done
+
+   return 0
+}
+
 function if_class_create
 {
    local _class="$1"
