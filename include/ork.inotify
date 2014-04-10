@@ -1,0 +1,100 @@
+#!/bin/bash
+
+source orkhideya
+ork_include proc
+
+function inotify_identity
+{
+   local _filename="$(realpath $1)"
+   local _ident="$(echo $_filename | sha256sum - | awk '{ print $1 }')"
+
+   echo ${_ident:0:8}
+}
+
+function inotify_label
+{
+   local _filename="$1"
+
+   echo "inotify-$(inotify_identity $_filename)"
+}
+
+function inotify_start
+{
+   local _filename="$1"
+   inotify_is_running "$_filename" && return 1
+
+   local _realfile="$(realpath "$_filename")"
+   local _label="$(inotify_label "$_filename")"
+   local _inotify_path="$(proc_label_path "$_label")"
+   local _inotify_logfile="$_inotify_path/logfile"
+   local _inotify_watchfile="$_inotify_path/watching"
+   local _inotify_hookfile="$_inotify_path/hooks"
+
+   ! proc_label_spawn_silent "$_label" inotifywait -m --format "%e::%f" -o "$_inotify_logfile" "$_realfile" && return 2
+   echo "$_realfile" > "$_inotify_watchfile"
+   touch "$_inotify_hookfile"
+
+   sleep 1
+
+   if ! proc_label_spawn_silent "$_label-agent" "source orkhideya; ork_include inotify; inotify_agent \"$_label\""; then
+      proc_label_kill "$_label"
+      return 2
+   fi
+
+   return 0
+}
+
+function inotify_stop
+{
+   local _filename="$1"
+   ! inotify_is_running "$_filename" && return 1
+
+   local _label="$(inotify_label "$_filename")"
+   proc_label_kill "$_label-agent"
+   proc_label_kill "$_label"
+
+   return 0
+}
+
+function inotify_agent
+{
+   local _label="$1"
+   ! proc_label_is_running "$_label" && return 1
+
+   local _inotify_path="$(proc_label_path "$_label")"
+   local _inotify_logfile="$_inotify_path/logfile"
+   local _inotify_hookfile="$_inotify_path/hooks"
+
+   tail -f "$_inotify_logfile" --pid "$(cat "$(proc_label_pid_file $_label)")" | while read _inotify_entry; do
+      cat "$_inotify_hookfile" | while read _hook_command; do
+         _entry_events="$(echo "$_inotify_entry" | awk -F '::' '{ print $1 }')"
+         _entry_filename="$(echo "$_inotify_entry" | awk -F '::' '{ print $2 }')"
+         bash -lc "$_hook_command" inotify_agent "$_entry_events" "$_entry_filename"
+      done
+   done
+
+   return 0
+}
+
+function inotify_hook
+{
+   local _filename="$1"
+   ! inotify_is_running "$_filename" && return 1
+
+   local _hook_command="${@:2}"
+   local _label="$(inotify_label "$_filename")"
+   local _inotify_path="$(proc_label_path "$_label")"
+   local _inotify_hookfile="$_inotify_path/hooks"
+
+   echo "$_hook_command" >> "$_inotify_hookfile"
+   return 0
+}
+
+function inotify_is_running
+{
+   local _filename="$1"
+   local _label="$(inotify_label "$_filename")"
+   ! proc_label_is_running "$_label" && return 1
+
+   return 0
+}
