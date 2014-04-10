@@ -141,6 +141,7 @@ function stdlib_forcepath
 
    if ! mkdir -p "$_rootpath"; then return 2; fi
 
+   chown -R "$ORK_USER:$ORK_GROUP" "$_file" 2>/dev/null
    echo "$_file"
    return 0
 }
