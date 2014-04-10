@@ -2,6 +2,14 @@
 
 EXECUTOR="${0##*/}" # one of those weird old tricks from @twopir
 
+if [ -z "$ORK_USER" ]; then
+   export ORK_USER="$(id -un)"
+fi
+
+if [ -z "$ORK_GROUP" ]; then
+   export ORK_GROUP="$(id -gn)"
+fi
+
 # some Ron Pauls to start us out
 function ork_pathcat
 {

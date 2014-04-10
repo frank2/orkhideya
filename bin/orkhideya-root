@@ -1,5 +1,13 @@
 #!/bin/bash
 
+if [ -z "$ORK_USER" ]; then
+   export ORK_USER="$(id -un)"
+fi
+
+if [ -z "$ORK_GROUP" ]; then
+   export ORK_GROUP="$(id -gn)"
+fi
+
 source orkhideya
 ork_include stdlib
 ork_include stdout
