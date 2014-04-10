@@ -1,11 +1,11 @@
 #!/bin/bash
 
-_exec_path="${0%%/${0##*/}}"
+_exec_path="${0%%/${0##*/}}"  # get the path relative to this installer
 pushd "$_exec_path" >/dev/null
-_exec_path="$(pwd -P)"
+_exec_path="$(pwd -P)"        # now resolve any symlinks
 popd >/dev/null
 
-export ORK_ROOT="$_exec_path"
+export ORK_ROOT="$_exec_path" # root path! \o/
 PATH="$PATH:$_exec_path/bin"
 
 source orkhideya
