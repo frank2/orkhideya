@@ -156,17 +156,24 @@ function proc_label_spawn
 
    stdout_warning "Executing: $(stdout_color_wrap main-focused "$_commandline")"
 
-   $_commandline 1>"$_stdoutfile" 2>"$_stderrfile" &
+   bash -c "$_commandline" 1>"$_stdoutfile" 2>"$_stderrfile" &
    local _new_pid="$!"
-   sleep 1
+   local _resulting_pid="$_new_pid"
 
-   local _resulting_pid="$(ps kstart_time ax | sort -r | awk '{ print $1,$5 }' | grep "$(echo $_commandline | awk '{ print $1 }')" | grep -v grep | head -n1 | awk '{ print $1 }')"
-   if [ -z "$_resulting_pid" -o "$(($_resulting_pid))" -lt "$(($_new_pid))" ]; then 
-      stdout_error "Fork failure. [new=$_new_pid, result=$_resulting_pid]"
-      stdout_error "stderr:"
-      cat "$_stderrfile" 1>&2
-      proc_silent rm -rf "$_pidpath" 
-      return 4
+   sleep 0.1
+
+   if ! proc_is_running "$_new_pid"; then
+      sleep 1
+
+      local _resulting_pid="$(ps kstart_time ax | sort -r | awk '{ print $1,$5 }' | grep "$(echo $_commandline | awk '{ print $1 }')" | grep -v grep | head -n1 | awk '{ print $1 }')"
+
+      if [ -z "$_resulting_pid" -o "$(($_resulting_pid))" -lt "$(($_new_pid))" ]; then 
+         stdout_error "Fork failure. [new=$_new_pid, result=$_resulting_pid]"
+         stdout_error "stderr:"
+         cat "$_stderrfile" 1>&2
+         proc_silent rm -rf "$_pidpath" 
+         return 4
+      fi
    fi
 
    echo "$_resulting_pid" > "$_pidfile"
