@@ -135,7 +135,7 @@ function ssh_site_config_build
    local _site_root="$(ssh_site_root)"
    local _key_root="$(ssh_key_root)"
    local _search_path="$_site_root/$(stdlib_pathify $_site)"
-   local _config_paths=$(for _config_path in $(find -L $_search_path -type d); do echo $(stdlib_strcount '/' "$_config_path") "$_config_path"; done | sort -g -r | awk '{ print $2 }' | sed -e "s,^$_site_root,,")
+   local _config_paths=$(for _config_path in $(find -L $_search_path -type d 2>/dev/null); do echo $(stdlib_strcount '/' "$_config_path") "$_config_path"; done | sort -g -r | awk '{ print $2 }' | sed -e "s,^$_site_root,,")
 
    local _ifs="$IFS"
    IFS="
@@ -210,7 +210,7 @@ function ssh_site_config_build
          done
       fi
 
-      for _other_key in $(find -L "$_key_path" -maxdepth 1 ! -type d -a \( -type f -o -links +1 \) -a ! -name "*.pub" -a ! -name "$ORK_SSH_KEYFILE" | sed -e "s,^$_key_path/,,g"); do
+      for _other_key in $(find -L "$_key_path" -maxdepth 1 ! -type d -a \( -type f -o -links +1 \) -a ! -name "*.pub" -a ! -name "$ORK_SSH_KEYFILE" 2>/dev/null | sed -e "s,^$_key_path/,,g"); do
          printf "\tIdentityFile %s\n" "$_key_path/$_other_key"
          _printed=1
       done
@@ -334,14 +334,14 @@ function ssh_site_link
    _link_path="$(ssh_site_path "$_link")"
 
    ! mkdir -p "$_link_path" && return 4
-   ! find "$_site_path" -maxdepth 1 -type f -exec ln -s {} "$_link_path" \; && return 5
+   ! find "$_site_path" -maxdepth 1 -type f -exec ln -s {} "$_link_path" \; 2>/dev/null && return 5
 
    if [ -d "$(ssh_key_path "$_site")" ]; then
       _site_keys="$(ssh_key_path "$_site")"
       _link_keys="$(ssh_key_path "$_link")"
 
       ! mkdir -p "$_link_keys" && return 6
-      ! find "$_site_keys" -maxdepth 1 -type f -exec ln -s {} "$_link_keys" \; && return 7
+      ! find "$_site_keys" -maxdepth 1 -type f -exec ln -s {} "$_link_keys" \; 2>/dev/null && return 7
    fi
 
    return 0
@@ -394,8 +394,8 @@ function ssh_key_gen
    fi
 
    if [ -z "$_arguments" ] || ! echo "$_arguments" | grep -q -P "(^-t|\s+-t)"; then
-      stdout_warning "No key type specified on the commandline. Using ECDSA by default."
-      _arguments="$_arguments -t "ecdsa""
+      stdout_warning "No key type specified on the commandline. Using ED25519 by default."
+      _arguments="$_arguments -t "ed25519""
    fi
 
    if [ ! -d "$(ssh_key_path "$_site")" ]; then
@@ -502,7 +502,7 @@ function ssh_site_list
    if [ -n "$_site" ]; then local _site_prefix="${_site}."; fi
 
    local _site_root="$(ork_pathcat "$(ssh_site_path)" "$(stdlib_pathify "$_site")")"
-   find "$_site_root" -type d | tail -n+2 | sed -e "s,^$_site_root/,$_site_prefix," | sed -e 's,/,.,g'
+   find "$_site_root" -type d | tail -n+2 | sed -e "s,^$_site_root/,$_site_prefix," 2>/dev/null | sed -e 's,/,.,g'
    return 0
 }
 
