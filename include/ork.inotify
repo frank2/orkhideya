@@ -3,6 +3,12 @@
 source orkhideya
 ork_include proc
 
+function inotify_depends
+{
+   ork_path_check inotifywait cat bash tail
+   return $?
+}
+
 function inotify_identity
 {
    local _filename="$(realpath $1)"
@@ -69,7 +75,7 @@ function inotify_agent
       cat "$_inotify_hookfile" | while read _hook_command; do
          _entry_events="$(echo "$_inotify_entry" | awk -F '::' '{ print $1 }')"
          _entry_filename="$(echo "$_inotify_entry" | awk -F '::' '{ print $2 }')"
-         bash -lc "$_hook_command" inotify_agent "$_entry_events" "$_entry_filename"
+         bash -c "$_hook_command" inotify_agent "$_entry_events" "$_entry_filename"
       done
    done
 

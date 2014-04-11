@@ -59,6 +59,12 @@ BG_PURPLE="${CC_BEGIN}${CB_PURPLE}m${CC_END}"
 BG_CYAN="${CC_BEGIN}${CB_CYAN}m${CC_END}"
 BG_GRAY="${CC_BEGIN}${CB_GRAY}m${CC_END}"
 
+function color_depends
+{
+   ork_path_check sed
+   return $?
+}
+
 function color_fg
 {
    _color="$1"

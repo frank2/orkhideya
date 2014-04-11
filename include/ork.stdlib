@@ -3,6 +3,12 @@
 source orkhideya
 ork_include stdout
 
+function stdlib_depends
+{
+   ork_path_check id tr sed vim grep wc sed awk chown sha1sum
+   return $?
+}
+
 function stdlib_trap
 {
    "$@"

@@ -10,6 +10,12 @@ if [ -z "$ORK_GROUP" ]; then
    export ORK_GROUP="$(id -gn)"
 fi
 
+function ork_depends
+{
+   which 'which' &>/dev/null
+   return $?
+}
+
 # some Ron Pauls to start us out
 function ork_pathcat
 {
@@ -188,6 +194,29 @@ function ork_include
       exit 1
    fi
 
+   local _dependency_check="${_library}_depends"
+   type "$_dependency_check" &>/dev/null
+   local _dependency_status="$?"
+
+   if [ "$_dependency_status" == "0" ]; then
+      local _dependency_result=$($_dependency_check)
+
+      if [ -n "$_dependency_result" ]; then
+         echo "$EXECUTOR: orkhideya: dependency failure (fatal): $_library ($_filename) ($_dependency_result)" 1>&2
+         exit 1
+      fi
+   fi
+
+   return 0
+}
+
+function ork_path_check
+{
+   for _command in $@; do
+      which "$_command" &>/dev/null
+      if [ "$?" != "0" ]; then echo "$_command"; return 1; fi
+   done
+
    return 0
 }
 
@@ -245,3 +274,5 @@ if [ -z "$ORK_PATH" ]; then
 else
    ORK_PATH="$ORK_PATH:$(ork_pathroot 'path')"
 fi
+
+! ork_depends && echo "$EXECUTOR: orkhideya: main dependency failure (fatal)" 1>&2 && exit 1

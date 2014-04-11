@@ -3,6 +3,12 @@
 source orkhideya
 ork_include stdlib
 
+function ipv4_depends
+{
+   ork_path_check grep awk egrep
+   return $?
+}
+
 function ipv4_mask
 {
    local _size="$1"

@@ -4,6 +4,12 @@ source orkhideya
 ork_include if
 ork_include stdlib
 
+function fw_depends
+{
+   ork_path_check iptables ip6tables egrep tail head cut
+   return $?
+}
+
 function fw_root
 {
    ork_configpath "fw"

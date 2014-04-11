@@ -5,6 +5,12 @@ ork_include if
 ork_include stdlib
 ork_include stdout
 
+function iw_depends
+{
+   ork_path_check cat iwconfig iwlist
+   return $?
+}
+
 function iw_root
 {
    ork_configpath "iw"

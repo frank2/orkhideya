@@ -4,6 +4,12 @@ source orkhideya
 ork_include stdlib
 ork_include stdout
 
+function ssh_depends
+{
+   ork_path_check find sort awk sed cat shred chmod ln rm ssh-keygen ssh tail
+   return $?
+}
+
 function ssh_root
 {
    ork_configpath "ssh"

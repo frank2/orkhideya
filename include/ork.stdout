@@ -3,6 +3,12 @@
 source orkhideya
 ork_include color
 
+function stdout_depends
+{
+   ork_path_check tput
+   return $?
+}
+
 function stdout_color
 {
    local _color="$1"

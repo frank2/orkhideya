@@ -4,6 +4,12 @@ source orkhideya
 ork_include stdlib
 ork_include ipv4
 
+function if_depends
+{
+   ork_path_check ifconfig route grep egrep awk head shred cat
+   return $?
+}
+
 function if_root
 {
    ork_configpath "if"

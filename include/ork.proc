@@ -3,6 +3,12 @@
 source orkhideya
 ork_include stdlib
 
+function proc_depends
+{
+   ork_path_check cat bash sleep ps sort awk grep head kill rm
+   return $?
+}
+
 function proc_root
 {
    ork_configpath "proc"

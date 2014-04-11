@@ -5,6 +5,12 @@ ork_include if
 ork_include iw
 ork_include stdlib
 
+function location_depends
+{
+   ork_path_check shred awk sort grep sed bc cat wc
+   return $?
+}
+
 function location_root
 {
    ork_configpath "location"

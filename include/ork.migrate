@@ -4,6 +4,12 @@ source orkhideya
 ork_include stdlib
 ork_include ssh
 
+function migrate_depends
+{
+   ork_path_check tar awk gzip shred cat shred ssh
+   return $?
+}
+
 function migrate_root
 {
    ork_configpath "migrate"
