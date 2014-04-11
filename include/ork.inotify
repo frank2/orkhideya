@@ -36,7 +36,7 @@ function inotify_start
    local _inotify_watchfile="$_inotify_path/watching"
    local _inotify_hookfile="$_inotify_path/hooks"
 
-   ! proc_label_spawn_silent "$_label" inotifywait -m --format "%e::%f" -o "$_inotify_logfile" "$_realfile" && return 2
+   ! proc_label_spawn_silent "$_label" inotifywait -m -r --format "%e::%f" -o "$_inotify_logfile" "$_realfile" && return 2
    echo "$_realfile" > "$_inotify_watchfile"
    touch "$_inotify_hookfile"
 
