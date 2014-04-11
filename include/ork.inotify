@@ -36,7 +36,7 @@ function inotify_start
    local _inotify_watchfile="$_inotify_path/watching"
    local _inotify_hookfile="$_inotify_path/hooks"
 
-   ! proc_label_spawn_silent "$_label" inotifywait -m -r --format "%e::%f" -o "$_inotify_logfile" "$_realfile" && return 2
+   ! proc_label_spawn_silent "$_label" inotifywait -m -r --format "%e::%w::%f" -o "$_inotify_logfile" "$_realfile" && return 2
    echo "$_realfile" > "$_inotify_watchfile"
    touch "$_inotify_hookfile"
 
@@ -74,8 +74,9 @@ function inotify_agent
    tail -f "$_inotify_logfile" --pid "$(cat "$(proc_label_pid_file $_label)")" | while read _inotify_entry; do
       cat "$_inotify_hookfile" | while read _hook_command; do
          _entry_events="$(echo "$_inotify_entry" | awk -F '::' '{ print $1 }')"
-         _entry_filename="$(echo "$_inotify_entry" | awk -F '::' '{ print $2 }')"
-         bash -c "$_hook_command" inotify_agent "$_entry_events" "$_entry_filename"
+         _entry_trigger="$(echo "$_inotify_entry" | awk -F '::' '{ print $2 }')"
+         _entry_filename="$(echo "$_inotify_entry" | awk -F '::' '{ print $3 }')"
+         bash -c "$_hook_command" inotify_agent "$_entry_events" "$_entry_trigger" "$_entry_filename"
       done
    done
 
