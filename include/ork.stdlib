@@ -131,10 +131,10 @@ function stdlib_cdup
    local _path="$@"
    if [ -z "$_path" ]; then return 1; fi
 
-   local _fixed_path="$(echo $_path | sed -re 's,/*\s*$,,')"
-   local _last="$(echo "$_fixed_path" | awk -F '/' '{ print $NF }')"
-   local _regex_last="$(echo "$_last" | sed -e 's,\[,\\[,g' -e 's,],\\],g')"
-   echo "$_fixed_path" | sed -re "s,/*${_regex_last}\$,,"
+   local _last="$(echo "$_path" | awk -F '/' '{ print $NF }')"
+   local _new_path="${_path:0:$(( ${#_path} - ${#_last} - 1 ))}"
+
+   echo "$_new_path"
    return 0
 }
 
