@@ -182,14 +182,12 @@ function stdout_prompt
    local _prompt="$@"
    stdout_warning "$_prompt"
    stdout_printf "%s " "$(color_render $ORK_STDOUT_PROMPT)"
+
+   local _response=""
    read _response
-   local _status="$?"
 
-   if [ "$_status" == "0" ]; then
-      echo $_response
-   fi
-
-   return $_status
+   echo "$_response"
+   return 0
 }
 
 # TODO expand this into a generic selection thing
@@ -199,9 +197,11 @@ function stdout_prompt_yesno
    local _response=""
 
    while [ "$_response" != "y" -a "$_response" != "n" ]; do
-      _response="$(stdlib_tolower "$(stdout_prompt "$_prompt [$(stdout_color_wrap main-focused y)/$(stdout_color_wrap main-focused n)]")")"
+      _response="$(stdlib_tolower "$(stdout_prompt "$_prompt [$(stdout_color_wrap main-focused y)/$(stdout_color_wrap main-focused N)]")")"
 
-      if [ "$_response" != "y" -a "$_response" != "n" ]; then
+      if [ -z "$_response" ]; then
+          _response="n"
+      elif [ "$_response" != "y" -a "$_response" != "n" ]; then
          stdout_error "Invalid response."
       fi
    done
@@ -210,8 +210,45 @@ function stdout_prompt_yesno
    return 0
 }
 
+function stdout_prompt_sequence
+{
+    local _prompt="$1"
+    test -z "$_prompt" && return 1
+
+    local _sequence="0"
+    local _items="$((${#@}-1))"
+    local _user_decision=""
+
+    while [ -z "$_user_decision" ]; do
+        while [ "$_sequence" -lt "$_items" ]; do
+            _value_decision="${@:$(($_sequence+2)):1}"
+            stdout_normal "$(printf '%2d' $(($_sequence+1)))$(stdout_color_wrap main-unfocused ')') $(stdout_color_wrap main-focused "$_value_decision")"
+            _sequence="$(($_sequence+1))"
+        done
+
+        _response="$(stdout_prompt "$_prompt")"
+
+        if [ -z "$(echo "$_response" | egrep -o '^[0-9]+$')" ]; then
+            stdout_error "Response must be a numeric value."
+            _sequence="0"
+            continue
+        fi
+
+        if [ "$_response" -lt "1" -o "$_response" -gt "$((${#@}-1))" ]; then
+            stdout_error "Invalid response."
+            _sequence="0"
+            continue
+        fi
+
+        _user_decision="$_response"
+    done
+
+    echo "${@:$(($_user_decision+1)):1}"
+    return 0
+}
+
 # theme colors
-ORK_STDOUT_COLOR_ATTENTION="$(color_fg lightcyan)"
+ORK_STDOUT_COLOR_ATTENTION="$(color_fg lightgreen)"
 ORK_STDOUT_COLOR_DECORATIVE="$(color_fg purple)"
 ORK_STDOUT_COLOR_ALTERNATE="$(color_fg cyan)"
 ORK_STDOUT_COLOR_WINDOW="$(color_fg lightcyan)"
@@ -221,7 +258,7 @@ ORK_STDOUT_COLOR_NORMAL="$(color_fg lightcyan)"
 ORK_STDOUT_COLOR_MAIN="$(color_fg lightpurple)"
 ORK_STDOUT_COLOR_MAIN_FOCUSED="$(color_fg lightpurple)"
 ORK_STDOUT_COLOR_MAIN_UNFOCUSED="$(color_fg purple)"
-ORK_STDOUT_COLOR_DESPERATE="$(color_fg lightcyan)"
+ORK_STDOUT_COLOR_DESPERATE="$(color_fg lightgreen)"
 
 ORK_STDOUT_SYSTEM_NAME="$(stdout_color main 'ORKH')"
 ORK_STDOUT_SYSTEM_NAME="${ORK_STDOUT_SYSTEM_NAME}$(stdout_color attention 'i')"
