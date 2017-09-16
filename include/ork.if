@@ -6,7 +6,7 @@ ork_include ipv4
 
 function if_depends
 {
-   ork_path_check ifconfig route grep egrep awk head shred cat
+   ork_path_check ifconfig ip grep egrep awk head shred cat
    return $?
 }
 
@@ -73,7 +73,7 @@ function if_gateway_interface
       local _genmask="0.0.0.0"
    fi
 
-   _gateway="$(route -n | egrep "^$_destination[[:space:]]+[[:digit:].]+[[:space:]]+$_genmask[[:space:]]+[[:upper:]]*G[[:upper:]]*" | awk '{ print $8 }' | head -n1)"
+   _gateway="$(ip route show default | egrep "^default via" | awk '{ print $3 }')"
    [ -z "$_gateway" ] && return 3
 
    echo "$_gateway"
